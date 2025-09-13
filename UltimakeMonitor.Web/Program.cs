@@ -1,0 +1,56 @@
+namespace UltimakeMonitor.Web;
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+        builder.AddServiceDefaults();
+
+        // Add services to the container.
+        builder.Services.AddRazorPages();
+
+        // Add HttpClient for API communication with service discovery
+        builder.Services.AddHttpClient<PrinterApiClient>(client =>
+        {
+            // The URL will be automatically resolved by service discovery
+            // "http://apiservice" matches the name we gave in AppHost
+            client.BaseAddress = new Uri("http://apiservice");
+        });
+
+        var app = builder.Build();
+
+        app.MapDefaultEndpoints();
+
+        // Configure the HTTP request pipeline.
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error");
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+
+        app.UseRouting();
+
+        app.UseAuthorization();
+
+        app.MapStaticAssets();
+        app.MapRazorPages()
+           .WithStaticAssets();
+
+        app.Run();
+    }
+}
+
+// Temporary placeholder for the API client
+public class PrinterApiClient
+{
+    private readonly HttpClient _httpClient;
+
+    public PrinterApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+}

@@ -1,0 +1,6 @@
+@UltimakeMonitor.ApiService_HostAddress = http://localhost:5009
+
+GET {{UltimakeMonitor.ApiService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
