@@ -1,3 +1,5 @@
+using UltimakeMonitor.Web.Services;
+
 namespace UltimakeMonitor.Web;
 
 public class Program
@@ -41,16 +43,5 @@ public class Program
            .WithStaticAssets();
 
         app.Run();
-    }
-}
-
-// Temporary placeholder for the API client
-public class PrinterApiClient
-{
-    private readonly HttpClient _httpClient;
-
-    public PrinterApiClient(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
     }
 }
