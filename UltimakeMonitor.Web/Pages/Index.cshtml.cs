@@ -32,6 +32,20 @@ public class IndexModel : PageModel
         }
     }
 
+    public async Task<IActionResult> OnGetPrinterListAsync()
+    {
+        try
+        {
+            Printers = await _printerApiClient.GetPrintersAsync();
+            return Partial("_PrinterList", Printers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load printers");
+            return Content("<div class='alert alert-danger'>Failed to load printers</div>");
+        }
+    }
+
     public async Task<IActionResult> OnGetPrinterDetailsAsync(string id)
     {
         try
