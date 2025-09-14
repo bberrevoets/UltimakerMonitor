@@ -16,6 +16,12 @@ public class Program
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
+        // Add HttpClient factory
+        builder.Services.AddHttpClient();
+        
+        // Register the Ultimaker API client
+        builder.Services.AddScoped<UltimakerApiClient>();
+
         // Register the printer discovery service
         builder.Services.AddSingleton<PrinterDiscoveryService>();
         builder.Services.AddHostedService<PrinterDiscoveryService>(provider => provider.GetRequiredService<PrinterDiscoveryService>());

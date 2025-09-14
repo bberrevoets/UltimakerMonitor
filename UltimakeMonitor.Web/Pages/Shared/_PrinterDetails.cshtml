@@ -35,10 +35,29 @@
                     <th>Bed Temperature:</th>
                     <td>@(Model.BedTemperature?.ToString("F1") ?? "N/A")°C</td>
                 </tr>
-                <tr>
-                    <th>Nozzle Temperature:</th>
-                    <td>@(Model.NozzleTemperature?.ToString("F1") ?? "N/A")°C</td>
-                </tr>
+                @if (Model.Nozzles.Any())
+                {
+                    @foreach (var nozzle in Model.Nozzles)
+                    {
+                        <tr>
+                            <th>Nozzle @(nozzle.Index + 1) Temperature:</th>
+                            <td>
+                                @(nozzle.Temperature?.ToString("F1") ?? "N/A")°C
+                                @if (nozzle.TargetTemperature.HasValue && nozzle.TargetTemperature > 0)
+                                {
+                                    <span class="text-muted">(Target: @nozzle.TargetTemperature.Value.ToString("F1")°C)</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <th>Nozzle Temperature:</th>
+                        <td>N/A</td>
+                    </tr>
+                }
             </table>
         </div>
     </div>

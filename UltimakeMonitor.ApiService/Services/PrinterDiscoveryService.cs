@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
+using Makaretu.Dns;
 using UltimakeMonitor.ApiService.Models;
 
 namespace UltimakeMonitor.ApiService.Services;
@@ -6,14 +8,16 @@ namespace UltimakeMonitor.ApiService.Services;
 public class PrinterDiscoveryService : BackgroundService
 {
     private readonly ILogger<PrinterDiscoveryService> _logger;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ConcurrentDictionary<string, Printer> _printers = new();
-    private readonly TimeSpan _discoveryInterval = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _discoveryInterval = TimeSpan.FromMinutes(5);
     private readonly TimeSpan _updateInterval = TimeSpan.FromSeconds(10);
+    private MulticastService? _mdns;
 
-    public PrinterDiscoveryService(ILogger<PrinterDiscoveryService> logger)
+    public PrinterDiscoveryService(ILogger<PrinterDiscoveryService> logger, IServiceProvider serviceProvider)
     {
         _logger = logger;
-        InitializeTestPrinters(); // For testing, we'll start with test data
+        _serviceProvider = serviceProvider;
     }
 
     public IEnumerable<Printer> GetAllPrinters() => _printers.Values;
@@ -23,6 +27,9 @@ public class PrinterDiscoveryService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Printer Discovery Service started");
+
+        // Initialize mDNS
+        InitializeMdns();
 
         // Run discovery immediately on startup
         await DiscoverPrintersAsync(stoppingToken);
@@ -34,7 +41,102 @@ public class PrinterDiscoveryService : BackgroundService
         var discoveryTask = RunDiscoveryLoopAsync(discoveryTimer, stoppingToken);
         var updateTask = RunUpdateLoopAsync(updateTimer, stoppingToken);
 
-        await Task.WhenAll(discoveryTask, updateTask);
+        try
+        {
+            await Task.WhenAll(discoveryTask, updateTask);
+        }
+        finally
+        {
+            _mdns?.Stop();
+            _mdns?.Dispose();
+        }
+    }
+
+    private void InitializeMdns()
+    {
+        _mdns = new MulticastService();
+        
+        _mdns.AnswerReceived += async (s, e) =>
+        {
+            var answer = e.Message.Answers.OfType<ARecord>().FirstOrDefault();
+            var ptrRecord = e.Message.Answers.OfType<PTRRecord>().FirstOrDefault();
+            var srvRecord = e.Message.Answers.OfType<SRVRecord>().FirstOrDefault();
+            
+            if (answer != null && ptrRecord != null)
+            {
+                var ipAddress = answer.Address.ToString();
+                var name = ptrRecord.DomainName.ToString();
+                
+                // Check if this is an Ultimaker printer
+                if (name.Contains("ultimaker", StringComparison.OrdinalIgnoreCase) || 
+                    name.Contains("_printer._tcp", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Discovered potential Ultimaker printer via mDNS: {Name} at {IP}", name, ipAddress);
+                    
+                    using var scope = _serviceProvider.CreateScope();
+                    var ultimakerClient = scope.ServiceProvider.GetRequiredService<UltimakerApiClient>();
+                    
+                    await CheckAndAddPrinterAsync(ipAddress, ultimakerClient);
+                }
+            }
+        };
+        
+        _mdns.Start();
+    }
+
+    private async Task DiscoverPrintersAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Starting mDNS printer discovery...");
+        
+        if (_mdns == null) return;
+        
+        try
+        {
+            // Query for Ultimaker printers
+            // Ultimaker printers typically advertise as "_printer._tcp.local" or "_ultimaker._tcp.local"
+            _mdns.SendQuery("_printer._tcp.local", type: DnsType.PTR);
+            _mdns.SendQuery("_ultimaker._tcp.local", type: DnsType.PTR);
+            _mdns.SendQuery("_http._tcp.local", type: DnsType.PTR);
+            
+            // Also try specific Ultimaker service names
+            _mdns.SendQuery("ultimaker.local", type: DnsType.A);
+            
+            // Wait a bit for responses
+            await Task.Delay(5000, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during mDNS discovery");
+        }
+        
+        _logger.LogInformation("mDNS discovery completed. Found {Count} printers", _printers.Count);
+    }
+
+    private async Task CheckAndAddPrinterAsync(string ipAddress, UltimakerApiClient client)
+    {
+        try
+        {
+            var printerInfo = await client.GetPrinterInfoAsync(ipAddress);
+            if (printerInfo != null)
+            {
+                var printer = new Printer
+                {
+                    Id = printerInfo.Guid ?? Guid.NewGuid().ToString(),
+                    Name = printerInfo.Name ?? $"Ultimaker at {ipAddress}",
+                    IpAddress = ipAddress,
+                    Model = printerInfo.Variant ?? "Unknown",
+                    Status = PrinterStatus.Idle,
+                    LastSeen = DateTime.UtcNow
+                };
+                
+                _printers.AddOrUpdate(printer.Id, printer, (_, _) => printer);
+                _logger.LogInformation("Added/Updated printer: {Name} at {IP}", printer.Name, ipAddress);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get info from {IP}, might not be an Ultimaker printer", ipAddress);
+        }
     }
 
     private async Task RunDiscoveryLoopAsync(PeriodicTimer timer, CancellationToken stoppingToken)
@@ -53,80 +155,94 @@ public class PrinterDiscoveryService : BackgroundService
         }
     }
 
-    private async Task DiscoverPrintersAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Starting printer discovery...");
-        
-        // TODO: Implement actual network discovery
-        // For now, we'll just ensure test printers exist
-        await Task.Delay(100, cancellationToken); // Simulate network delay
-        
-        _logger.LogInformation("Printer discovery completed. Found {Count} printers", _printers.Count);
-    }
-
     private async Task UpdatePrinterStatusesAsync(CancellationToken cancellationToken)
     {
-        foreach (var printer in _printers.Values)
+        using var scope = _serviceProvider.CreateScope();
+        var ultimakerClient = scope.ServiceProvider.GetRequiredService<UltimakerApiClient>();
+        
+        var updateTasks = _printers.Values.Select(printer => 
+            UpdatePrinterStatusAsync(printer, ultimakerClient, cancellationToken));
+        
+        await Task.WhenAll(updateTasks);
+    }
+
+    private async Task UpdatePrinterStatusAsync(Printer printer, UltimakerApiClient client, CancellationToken cancellationToken)
+    {
+        try
         {
-            // TODO: Implement actual printer status polling
-            // For now, simulate status updates
-            await Task.Delay(10, cancellationToken); // Simulate network delay
-            
-            printer.LastSeen = DateTime.UtcNow;
-            
-            // Simulate print progress
-            if (printer is { CurrentJob: not null, Status: PrinterStatus.Printing })
+            // Get printer status
+            var status = await client.GetPrinterStatusAsync(printer.IpAddress, cancellationToken);
+            if (status != null)
             {
-                printer.CurrentJob.ProgressPercentage = Math.Min(100, printer.CurrentJob.ProgressPercentage + Random.Shared.Next(1, 5));
-                if (printer.CurrentJob.ProgressPercentage >= 100)
+                printer.Status = MapPrinterStatus(status.Status);
+                printer.BedTemperature = status.Bed?.Temperature?.Current;
+                
+                // Clear and update nozzles
+                printer.Nozzles.Clear();
+                if (status.Heads != null)
                 {
-                    printer.Status = PrinterStatus.Idle;
-                    printer.CurrentJob = null;
-                    printer.BedTemperature = 25.0;
-                    printer.NozzleTemperature = 25.0;
+                    for (int headIndex = 0; headIndex < status.Heads.Count; headIndex++)
+                    {
+                        var head = status.Heads[headIndex];
+                        if (head.Extruders != null)
+                        {
+                            for (int extruderIndex = 0; extruderIndex < head.Extruders.Count; extruderIndex++)
+                            {
+                                var extruder = head.Extruders[extruderIndex];
+                                if (extruder.Hotend != null)
+                                {
+                                    printer.Nozzles.Add(new NozzleInfo
+                                    {
+                                        Index = extruderIndex,
+                                        Temperature = extruder.Hotend.Temperature?.Current,
+                                        TargetTemperature = extruder.Hotend.Temperature?.Target
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                printer.LastSeen = DateTime.UtcNow;
+            }
+            
+            // Get print job if printing
+            if (printer.Status == PrinterStatus.Printing)
+            {
+                var printJob = await client.GetPrintJobStatusAsync(printer.IpAddress, cancellationToken);
+                if (printJob != null)
+                {
+                    printer.CurrentJob = new PrintJob
+                    {
+                        Name = printJob.Name ?? "Unknown",
+                        ProgressPercentage = (int)(printJob.Progress * 100),
+                        TimeElapsed = TimeSpan.FromSeconds(printJob.TimeElapsed),
+                        TimeRemaining = TimeSpan.FromSeconds(Math.Max(0, printJob.TimeTotal - printJob.TimeElapsed))
+                    };
                 }
             }
+            else
+            {
+                printer.CurrentJob = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating status for printer {PrinterId}", printer.Id);
+            printer.Status = PrinterStatus.Offline;
         }
     }
 
-    private void InitializeTestPrinters()
+    private static PrinterStatus MapPrinterStatus(string ultimakerStatus)
     {
-        var testPrinters = new[]
+        return ultimakerStatus?.ToLowerInvariant() switch
         {
-            new Printer
-            {
-                Id = "printer-1",
-                Name = "Ultimaker 3 - Office",
-                IpAddress = "192.168.1.100",
-                Model = "Ultimaker 3",
-                Status = PrinterStatus.Printing,
-                BedTemperature = 60.5,
-                NozzleTemperature = 210.0,
-                CurrentJob = new PrintJob
-                {
-                    Name = "test-part.gcode",
-                    ProgressPercentage = 45,
-                    TimeElapsed = TimeSpan.FromHours(1.5),
-                    TimeRemaining = TimeSpan.FromHours(2)
-                },
-                LastSeen = DateTime.UtcNow
-            },
-            new Printer
-            {
-                Id = "printer-2",
-                Name = "Ultimaker 3 Extended - Lab",
-                IpAddress = "192.168.1.101",
-                Model = "Ultimaker 3 Extended",
-                Status = PrinterStatus.Idle,
-                BedTemperature = 25.0,
-                NozzleTemperature = 25.0,
-                LastSeen = DateTime.UtcNow
-            }
+            "idle" => PrinterStatus.Idle,
+            "printing" => PrinterStatus.Printing,
+            "paused" => PrinterStatus.Paused,
+            "error" => PrinterStatus.Error,
+            "maintenance" => PrinterStatus.Maintenance,
+            _ => PrinterStatus.Offline
         };
-
-        foreach (var printer in testPrinters)
-        {
-            _printers.TryAdd(printer.Id, printer);
-        }
     }
 }

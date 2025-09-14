@@ -1,0 +1,32 @@
+BZJ8FDIBCGV9
+
+Coupon Bambulab
+
+I already have a blank solution created called UltimakeMonitor. And loaded in VS2026 Insider preview
+Guide me through the adding projects to this solution so that Aspire can be used that has an Razor Website and the necessary projects, to create a monitoring website for monitoring all Ultimaker 3D printers on my network.
+
+I want on the Index page (Home page) cards that represents all found printers and their state. And when i click on that card, i want to popup a much bigger card, with as much of possible data and states of that printer.
+I want all css that is specific for a cshtml file be in a behind file. for example Index.cshtml and Index.cshtml.css, so just like the code behind files.
+I want you to show me the step step by step, and explain why you do that step, and wait for me for the next step unitl i have implemented that step and have no more questions about it.
+
+
+What we've built so far:
+1.	Aspire-based architecture with Web frontend and API backend
+2.	Service discovery - no hardcoded URLs
+3.	Background service for printer monitoring
+4.	Real-time updates with auto-refresh
+5.	Responsive UI with Bootstrap
+6.	Modal dialogs for detailed views
+7.	Simulated printer data for testing
+Potential next features to implement:
+1.	Real Ultimaker API integration - Replace simulation with actual printer communication
+2.	Database persistence - Store printer history and statistics
+3.	Email/SMS alerts - Notify when prints complete or fail
+4.	Multi-user support - User accounts and permissions
+5.	Print history - Track completed jobs
+6.	Material tracking - Monitor filament usage
+7.	Export reports - Generate CSV/PDF reports
+8.	Dark mode - UI theme switching
+9.	Mobile app - Using .NET MAUI
+10.	SignalR integration - Real-time push updates instead of polling
+Which feature would you like to implement next, or would you prefer to polish the existing functionality?

@@ -2,249 +2,271 @@
 @using UltimakeMonitor.Web.Models
 @model IndexModel
 @{
-    ViewData["Title"] = "Printer Monitor";
+	ViewData["Title"] = "Printer Monitor";
 }
 
 <div class="text-center">
-    <h1 class="display-4">Ultimaker Printer Monitor</h1>
-    <p class="lead">Real-time monitoring of your 3D printers</p>
+	<h1 class="display-4">Ultimaker Printer Monitor</h1>
+	<p class="lead">Real-time monitoring of your 3D printers</p>
 </div>
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Printers</h2>
-        <div>
-            <button class="btn btn-sm btn-secondary" onclick="toggleAutoRefresh()">
-                <span id="autoRefreshIcon">⏸️</span> Auto-refresh: <span id="autoRefreshStatus">ON</span>
-            </button>
-            <button class="btn btn-sm btn-primary" onclick="refreshPrinters()">🔄 Refresh Now</button>
-        </div>
-    </div>
-    
-    <div id="printersContainer">
-        <div class="row">
-            @if (Model.Printers.Any())
-            {
-                @foreach (var printer in Model.Printers)
-                {
-                    <div class="col-md-4 mb-4">
-                        <div class="card printer-card h-100" data-printer-id="@printer.Id" onclick="showPrinterDetails('@printer.Id')">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">@printer.Name</h5>
-                                <small class="text-muted">@printer.Model</small>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-2">
-                                    <span class="badge bg-@GetStatusColor(printer.Status)">@printer.Status</span>
-                                </div>
-                                <p class="card-text">
-                                    <strong>IP:</strong> @printer.IpAddress<br />
-                                    <strong>Bed:</strong> @(printer.BedTemperature?.ToString("F1") ?? "N/A")°C<br />
-                                    <strong>Nozzle:</strong> @(printer.NozzleTemperature?.ToString("F1") ?? "N/A")°C
-                                </p>
-                                @if (printer.CurrentJob != null)
-                                {
-                                    <div class="mt-3">
-                                        <p class="mb-1"><strong>Current Job:</strong> @printer.CurrentJob.Name</p>
-                                        <div class="progress">
-                                            <div class="progress-bar" role="progressbar" 
-                                                 style="width: @printer.CurrentJob.ProgressPercentage%"
-                                                 aria-valuenow="@printer.CurrentJob.ProgressPercentage" 
-                                                 aria-valuemin="0" aria-valuemax="100">
-                                                @printer.CurrentJob.ProgressPercentage%
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="card-footer text-muted">
-                                Last seen: @printer.LastSeen.ToString("g")
-                            </div>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <div class="col-12 text-center">
-                    <p class="text-muted">No printers found. Click the button below to discover printers on your network.</p>
-                    <button class="btn btn-primary" onclick="discoverPrinters()">Discover Printers</button>
-                </div>
-            }
-        </div>
-    </div>
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<h2>Printers</h2>
+		<div>
+			<button class="btn btn-sm btn-secondary" onclick="toggleAutoRefresh()">
+				<span id="autoRefreshIcon">⏸️</span> Auto-refresh: <span id="autoRefreshStatus">ON</span>
+			</button>
+			<button class="btn btn-sm btn-primary" onclick="refreshPrinters()">🔄 Refresh Now</button>
+		</div>
+	</div>
+
+	<div id="printersContainer">
+		<div class="row">
+			@if (Model.Printers.Any())
+			{
+				@foreach (var printer in Model.Printers)
+				{
+					<div class="col-md-4 mb-4">
+						<div class="card printer-card h-100" data-printer-id="@printer.Id" onclick="showPrinterDetails('@printer.Id')">
+							<div class="card-header">
+								<h5 class="card-title mb-0">@printer.Name</h5>
+								<small class="text-muted">@printer.Model</small>
+							</div>
+							<div class="card-body">
+								<div class="mb-2">
+									<span class="badge bg-@GetStatusColor(printer.Status)">@printer.Status</span>
+								</div>
+								<p class="card-text">
+									<strong>IP:</strong> @printer.IpAddress<br/>
+									<strong>Bed:</strong> @(printer.BedTemperature?.ToString("F1") ?? "N/A")°C<br/>
+									@if (printer.Nozzles.Any())
+									{
+										@foreach (var nozzle in printer.Nozzles)
+										{
+											<span>
+												<strong>Nozzle @(nozzle.Index + 1):</strong> @(nozzle.Temperature?.ToString("F1") ?? "N/A")°C<br/>
+											</span>
+										}
+									}
+									else
+									{
+										<span>
+											<strong>Nozzle:</strong> N/A°C<br />
+										</span>
+									}
+								</p>
+								@if (printer.CurrentJob != null)
+								{
+									<div class="mt-3">
+										<p class="mb-1">
+											<strong>Current Job:</strong> @printer.CurrentJob.Name
+										</p>
+										<div class="progress">
+											<div class="progress-bar" role="progressbar"
+											     style="width: @printer.CurrentJob.ProgressPercentage%"
+											     aria-valuenow="@printer.CurrentJob.ProgressPercentage"
+											     aria-valuemin="0" aria-valuemax="100">
+												@printer.CurrentJob.ProgressPercentage%
+											</div>
+										</div>
+									</div>
+								}
+							</div>
+							<div class="card-footer text-muted">
+								Last seen: @printer.LastSeen.ToString("g")
+							</div>
+						</div>
+					</div>
+				}
+			}
+			else
+			{
+				<div class="col-12 text-center">
+					<p class="text-muted">No printers found. Click the button below to discover printers on your network.</p>
+					<button class="btn btn-primary" onclick="discoverPrinters()">Discover Printers</button>
+				</div>
+			}
+		</div>
+	</div>
 </div>
 
 <!-- Printer Details Modal -->
 <div class="modal fade" id="printerDetailsModal" tabindex="-1" aria-labelledby="printerDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="printerDetailsModalLabel">Printer Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="printerDetailsContent">
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <small class="me-auto text-muted">Auto-refreshing every 3 seconds</small>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="refreshPrinterDetails()">Refresh</button>
-            </div>
-        </div>
-    </div>
+	<div class="modal-dialog modal-lg">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="printerDetailsModalLabel">Printer Details</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body" id="printerDetailsContent">
+				<div class="text-center">
+					<div class="spinner-border" role="status">
+						<span class="visually-hidden">Loading...</span>
+					</div>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<small class="me-auto text-muted">Auto-refreshing every 3 seconds</small>
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+				<button type="button" class="btn btn-primary" onclick="refreshPrinterDetails()">Refresh</button>
+			</div>
+		</div>
+	</div>
 </div>
 
 @functions {
-    private string GetStatusColor(PrinterStatus status)
-    {
-        return status switch
-        {
-            PrinterStatus.Idle => "success",
-            PrinterStatus.Printing => "primary",
-            PrinterStatus.Paused => "warning",
-            PrinterStatus.Error => "danger",
-            PrinterStatus.Offline => "secondary",
-            PrinterStatus.Maintenance => "info",
-            _ => "secondary"
-        };
-    }
+
+	private string GetStatusColor(PrinterStatus status)
+	{
+		return status switch
+		{
+			PrinterStatus.Idle => "success",
+			PrinterStatus.Printing => "primary",
+			PrinterStatus.Paused => "warning",
+			PrinterStatus.Error => "danger",
+			PrinterStatus.Offline => "secondary",
+			PrinterStatus.Maintenance => "info",
+			_ => "secondary"
+		};
+	}
+
 }
 
 @section Scripts {
-    <script>
-        let currentPrinterId = null;
-        let autoRefreshEnabled = true;
-        let refreshInterval = null;
-        let modalRefreshInterval = null;
-        let modalAutoRefreshEnabled = true;
+	<script>
+		let currentPrinterId = null;
+		let autoRefreshEnabled = true;
+		let refreshInterval = null;
+		let modalRefreshInterval = null;
+		let modalAutoRefreshEnabled = true;
 
-        // Start auto-refresh when page loads
-        window.addEventListener('load', function() {
-            startAutoRefresh();
-        });
+// Start auto-refresh when page loads
+		window.addEventListener('load',
+			function() {
+				startAutoRefresh();
+			});
 
-        // Listen for modal events
-        document.getElementById('printerDetailsModal').addEventListener('shown.bs.modal', function () {
-            startModalAutoRefresh();
-        });
+// Listen for modal events
+		document.getElementById('printerDetailsModal').addEventListener('shown.bs.modal',
+			function() {
+				startModalAutoRefresh();
+			});
 
-        document.getElementById('printerDetailsModal').addEventListener('hidden.bs.modal', function () {
-            stopModalAutoRefresh();
-        });
+		document.getElementById('printerDetailsModal').addEventListener('hidden.bs.modal',
+			function() {
+				stopModalAutoRefresh();
+			});
 
-        function startAutoRefresh() {
-            if (autoRefreshEnabled && !refreshInterval) {
-                refreshInterval = setInterval(refreshPrinters, 5000); // Refresh every 5 seconds
-            }
-        }
+		function startAutoRefresh() {
+			if (autoRefreshEnabled && !refreshInterval) {
+				refreshInterval = setInterval(refreshPrinters, 5000); // Refresh every 5 seconds
+			}
+		}
 
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
+		function stopAutoRefresh() {
+			if (refreshInterval) {
+				clearInterval(refreshInterval);
+				refreshInterval = null;
+			}
+		}
 
-        function startModalAutoRefresh() {
-            if (modalAutoRefreshEnabled && !modalRefreshInterval && currentPrinterId) {
-                modalRefreshInterval = setInterval(() => {
-                    if (currentPrinterId) {
-                        loadPrinterDetails(currentPrinterId, true); // true = silent refresh
-                    }
-                }, 3000); // Refresh modal every 3 seconds
-            }
-        }
+		function startModalAutoRefresh() {
+			if (modalAutoRefreshEnabled && !modalRefreshInterval && currentPrinterId) {
+				modalRefreshInterval = setInterval(() => {
+						if (currentPrinterId) {
+							loadPrinterDetails(currentPrinterId, true); // true = silent refresh
+						}
+					},
+					3000); // Refresh modal every 3 seconds
+			}
+		}
 
-        function stopModalAutoRefresh() {
-            if (modalRefreshInterval) {
-                clearInterval(modalRefreshInterval);
-                modalRefreshInterval = null;
-            }
-        }
+		function stopModalAutoRefresh() {
+			if (modalRefreshInterval) {
+				clearInterval(modalRefreshInterval);
+				modalRefreshInterval = null;
+			}
+		}
 
-        function toggleAutoRefresh() {
-            autoRefreshEnabled = !autoRefreshEnabled;
-            document.getElementById('autoRefreshStatus').textContent = autoRefreshEnabled ? 'ON' : 'OFF';
-            document.getElementById('autoRefreshIcon').textContent = autoRefreshEnabled ? '⏸️' : '▶️';
-            
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        }
+		function toggleAutoRefresh() {
+			autoRefreshEnabled = !autoRefreshEnabled;
+			document.getElementById('autoRefreshStatus').textContent = autoRefreshEnabled ? 'ON' : 'OFF';
+			document.getElementById('autoRefreshIcon').textContent = autoRefreshEnabled ? '⏸️' : '▶️';
 
-        async function refreshPrinters() {
-            try {
-                const response = await fetch('/Index?handler=PrinterList');
-                if (response.ok) {
-                    const html = await response.text();
-                    document.getElementById('printersContainer').innerHTML = html;
-                }
-            } catch (error) {
-                console.error('Error refreshing printers:', error);
-            }
-        }
+			if (autoRefreshEnabled) {
+				startAutoRefresh();
+			} else {
+				stopAutoRefresh();
+			}
+		}
 
-        function showPrinterDetails(printerId) {
-            currentPrinterId = printerId;
-            const modal = new bootstrap.Modal(document.getElementById('printerDetailsModal'));
-            modal.show();
-            loadPrinterDetails(printerId);
-        }
+		async function refreshPrinters() {
+			try {
+				const response = await fetch('/Index?handler=PrinterList');
+				if (response.ok) {
+					const html = await response.text();
+					document.getElementById('printersContainer').innerHTML = html;
+				}
+			} catch (error) {
+				console.error('Error refreshing printers:', error);
+			}
+		}
 
-        function refreshPrinterDetails() {
-            if (currentPrinterId) {
-                loadPrinterDetails(currentPrinterId);
-            }
-        }
+		function showPrinterDetails(printerId) {
+			currentPrinterId = printerId;
+			const modal = new bootstrap.Modal(document.getElementById('printerDetailsModal'));
+			modal.show();
+			loadPrinterDetails(printerId);
+		}
 
-        async function loadPrinterDetails(printerId, silent = false) {
-            const contentDiv = document.getElementById('printerDetailsContent');
-            
-            // Only show spinner on initial load or manual refresh
-            if (!silent) {
-                contentDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-            }
+		function refreshPrinterDetails() {
+			if (currentPrinterId) {
+				loadPrinterDetails(currentPrinterId);
+			}
+		}
 
-            try {
-                const response = await fetch(`/Index?handler=PrinterDetails&id=${printerId}`);
-                if (response.ok) {
-                    const html = await response.text();
-                    
-                    // Only update if content has changed (to avoid flicker)
-                    if (contentDiv.innerHTML !== html) {
-                        contentDiv.innerHTML = html;
-                    }
-                } else if (!silent) {
-                    contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load printer details</div>';
-                }
-            } catch (error) {
-                console.error('Error loading printer details:', error);
-                if (!silent) {
-                    contentDiv.innerHTML = '<div class="alert alert-danger">Error loading printer details</div>';
-                }
-            }
-        }
+		async function loadPrinterDetails(printerId, silent = false) {
+			const contentDiv = document.getElementById('printerDetailsContent');
 
-        async function discoverPrinters() {
-            try {
-                const response = await fetch('/api/printers/discover', { method: 'POST' });
-                if (response.ok) {
-                    alert('Printer discovery initiated!');
-                    setTimeout(refreshPrinters, 1000); // Refresh after 1 second
-                } else {
-                    alert('Failed to initiate printer discovery');
-                }
-            } catch (error) {
-                console.error('Error discovering printers:', error);
-                alert('Error discovering printers');
-            }
-        }
-    </script>
+			// Only show spinner on initial load or manual refresh
+			if (!silent) {
+				contentDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+			}
+
+			try {
+				const response = await fetch(`/Index?handler=PrinterDetails&id=${printerId}`);
+				if (response.ok) {
+					const html = await response.text();
+
+					// Only update if content has changed (to avoid flicker)
+					if (contentDiv.innerHTML !== html) {
+						contentDiv.innerHTML = html;
+					}
+				} else if (!silent) {
+					contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load printer details</div>';
+				}
+			} catch (error) {
+				console.error('Error loading printer details:', error);
+				if (!silent) {
+					contentDiv.innerHTML = '<div class="alert alert-danger">Error loading printer details</div>';
+				}
+			}
+		}
+
+		async function discoverPrinters() {
+			try {
+				const response = await fetch('/api/printers/discover', { method: 'POST' });
+				if (response.ok) {
+					alert('Printer discovery initiated!');
+					setTimeout(refreshPrinters, 1000); // Refresh after 1 second
+				} else {
+					alert('Failed to initiate printer discovery');
+				}
+			} catch (error) {
+				console.error('Error discovering printers:', error);
+				alert('Error discovering printers');
+			}
+		}
+	</script>
 }

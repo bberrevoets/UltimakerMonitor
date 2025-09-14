@@ -8,9 +8,16 @@ public class Printer
     public string Model { get; set; } = string.Empty;
     public PrinterStatus Status { get; set; }
     public double? BedTemperature { get; set; }
-    public double? NozzleTemperature { get; set; }
+    public List<NozzleInfo> Nozzles { get; set; } = new();
     public PrintJob? CurrentJob { get; set; }
     public DateTime LastSeen { get; set; }
+}
+
+public class NozzleInfo
+{
+    public int Index { get; set; }
+    public double? Temperature { get; set; }
+    public double? TargetTemperature { get; set; }
 }
 
 public enum PrinterStatus
