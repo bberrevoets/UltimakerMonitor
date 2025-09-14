@@ -1,0 +1,18 @@
+﻿body { }
+
+.printer-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.printer-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-5px);
+}
+
+.progress { height: 20px; }
+
+.progress-bar {
+    font-size: 12px;
+    line-height: 20px;
+}

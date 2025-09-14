@@ -1,6 +1,6 @@
 <Solution>
-  <Project Path="UltimakeMonitor.ApiService/UltimakeMonitor.ApiService.csproj" />
-  <Project Path="UltimakeMonitor.AppHost/UltimakeMonitor.AppHost.csproj" />
-  <Project Path="UltimakeMonitor.ServiceDefaults/UltimakeMonitor.ServiceDefaults.csproj" Id="494f6c2c-3e62-417a-8310-87c60b998f40" />
-  <Project Path="UltimakeMonitor.Web/UltimakeMonitor.Web.csproj" />
+  <Project Path="UltimakerMonitor.ApiService/UltimakerMonitor.ApiService.csproj" />
+  <Project Path="UltimakerMonitor.AppHost/UltimakerMonitor.AppHost.csproj" />
+  <Project Path="UltimakerMonitor.ServiceDefaults/UltimakerMonitor.ServiceDefaults.csproj" Id="494f6c2c-3e62-417a-8310-87c60b998f40" />
+  <Project Path="UltimakerMonitor.Web/UltimakerMonitor.Web.csproj" />
 </Solution>

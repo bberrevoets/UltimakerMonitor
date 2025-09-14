@@ -1,0 +1,120 @@
+﻿@using UltimakerMonitor.Web.Models
+@model UltimakerMonitor.Web.Models.Printer
+
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-md-6">
+			<h5>General Information</h5>
+			<table class="table table-sm">
+				<tr>
+					<th>Name:</th>
+					<td>@Model.Name</td>
+				</tr>
+				<tr>
+					<th>Model:</th>
+					<td>@Model.Model</td>
+				</tr>
+				<tr>
+					<th>IP Address:</th>
+					<td>@Model.IpAddress</td>
+				</tr>
+				<tr>
+					<th>Status:</th>
+					<td>
+						<span class="badge bg-@GetStatusColor(Model.Status)">@Model.Status</span>
+					</td>
+				</tr>
+				<tr>
+					<th>Last Seen:</th>
+					<td>@Model.LastSeen.ToString("g")</td>
+				</tr>
+			</table>
+		</div>
+		<div class="col-md-6">
+			<h5>Temperature Information</h5>
+			<table class="table table-sm">
+				<tr>
+					<th>Bed Temperature:</th>
+					<td>@(Model.BedTemperature?.ToString("F1") ?? "N/A")°C</td>
+				</tr>
+				@if (Model.Nozzles.Any())
+				{
+					@foreach (var nozzle in Model.Nozzles)
+					{
+						<tr>
+							<th>Nozzle @(nozzle.Index + 1) Temperature:</th>
+							<td>
+								@(nozzle.Temperature?.ToString("F1") ?? "N/A")°C
+								@if (nozzle.TargetTemperature.HasValue && nozzle.TargetTemperature > 0)
+								{
+									<span class="text-muted">(Target: @nozzle.TargetTemperature.Value.ToString("F1")°C)</span>
+								}
+							</td>
+						</tr>
+					}
+				}
+				else
+				{
+					<tr>
+						<th>Nozzle Temperature:</th>
+						<td>N/A</td>
+					</tr>
+				}
+			</table>
+		</div>
+	</div>
+
+	@if (Model.CurrentJob != null)
+	{
+		<div class="row mt-3">
+			<div class="col-12">
+				<h5>Current Print Job</h5>
+				<table class="table table-sm">
+					<tr>
+						<th>File Name:</th>
+						<td>@Model.CurrentJob.Name</td>
+					</tr>
+					<tr>
+						<th>Progress:</th>
+						<td>
+							<div class="progress" style="height: 25px;">
+								<div class="progress-bar" role="progressbar"
+								     style="width: @Model.CurrentJob.ProgressPercentage%"
+								     aria-valuenow="@Model.CurrentJob.ProgressPercentage"
+								     aria-valuemin="0" aria-valuemax="100">
+									@Model.CurrentJob.ProgressPercentage%
+								</div>
+							</div>
+						</td>
+					</tr>
+					<tr>
+						<th>Time Elapsed:</th>
+						<td>@(Model.CurrentJob.TimeElapsed?.ToString(@"hh\:mm\:ss") ?? "N/A")</td>
+					</tr>
+					<tr>
+						<th>Time Remaining:</th>
+						<td>@(Model.CurrentJob.TimeRemaining?.ToString(@"hh\:mm\:ss") ?? "N/A")</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+	}
+</div>
+
+@functions {
+
+	private string GetStatusColor(PrinterStatus status)
+	{
+		return status switch
+		{
+			PrinterStatus.Idle => "success",
+			PrinterStatus.Printing => "primary",
+			PrinterStatus.Paused => "warning",
+			PrinterStatus.Error => "danger",
+			PrinterStatus.Offline => "secondary",
+			PrinterStatus.Maintenance => "info",
+			_ => "secondary"
+		};
+	}
+
+}
