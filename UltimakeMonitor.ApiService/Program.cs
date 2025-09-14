@@ -87,6 +87,30 @@ public class Program
         })
         .WithName("GetPrinters");
 
+        app.MapGet("/api/printers/{id}", (string id) =>
+        {
+            var printer = new Printer
+            {
+                Id = id,
+                Name = id == "printer-1" ? "Ultimaker 3 - Office" : "Ultimaker 3 Extended - Lab",
+                IpAddress = id == "printer-1" ? "192.168.1.100" : "192.168.1.101",
+                Model = id == "printer-1" ? "Ultimaker 3" : "Ultimaker 3 Extended",
+                Status = id == "printer-1" ? PrinterStatus.Printing : PrinterStatus.Idle,
+                BedTemperature = id == "printer-1" ? 60.5 : 25.0,
+                NozzleTemperature = id == "printer-1" ? 210.0 : 25.0,
+                CurrentJob = id == "printer-1" ? new PrintJob
+                {
+                    Name = "test-part.gcode",
+                    ProgressPercentage = 45,
+                    TimeElapsed = TimeSpan.FromHours(1.5),
+                    TimeRemaining = TimeSpan.FromHours(2)
+                } : null,
+                LastSeen = DateTime.UtcNow
+            };
+            return printer;
+        })
+        .WithName("GetPrinter");
+
         app.Run();
     }
 }

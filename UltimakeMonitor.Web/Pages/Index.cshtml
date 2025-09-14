@@ -17,7 +17,7 @@
             @foreach (var printer in Model.Printers)
             {
                 <div class="col-md-4 mb-4">
-                    <div class="card printer-card h-100" data-printer-id="@printer.Id">
+                    <div class="card printer-card h-100" data-printer-id="@printer.Id" onclick="showPrinterDetails('@printer.Id')">
                         <div class="card-header">
                             <h5 class="card-title mb-0">@printer.Name</h5>
                             <small class="text-muted">@printer.Model</small>
@@ -63,6 +63,29 @@
     </div>
 </div>
 
+<!-- Printer Details Modal -->
+<div class="modal fade" id="printerDetailsModal" tabindex="-1" aria-labelledby="printerDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="printerDetailsModalLabel">Printer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="printerDetailsContent">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="refreshPrinterDetails()">Refresh</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @functions {
     private string GetStatusColor(PrinterStatus status)
     {
@@ -77,4 +100,46 @@
             _ => "secondary"
         };
     }
+}
+
+@section Scripts {
+    <script>
+        let currentPrinterId = null;
+
+        function showPrinterDetails(printerId) {
+            currentPrinterId = printerId;
+            const modal = new bootstrap.Modal(document.getElementById('printerDetailsModal'));
+            modal.show();
+            loadPrinterDetails(printerId);
+        }
+
+        function refreshPrinterDetails() {
+            if (currentPrinterId) {
+                loadPrinterDetails(currentPrinterId);
+            }
+        }
+
+        async function loadPrinterDetails(printerId) {
+            const contentDiv = document.getElementById('printerDetailsContent');
+            contentDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+            try {
+                const response = await fetch(`/Index?handler=PrinterDetails&id=${printerId}`);
+                if (response.ok) {
+                    const html = await response.text();
+                    contentDiv.innerHTML = html;
+                } else {
+                    contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load printer details</div>';
+                }
+            } catch (error) {
+                console.error('Error loading printer details:', error);
+                contentDiv.innerHTML = '<div class="alert alert-danger">Error loading printer details</div>';
+            }
+        }
+
+        async function discoverPrinters() {
+            // TODO: Implement printer discovery
+            alert('Printer discovery will be implemented soon!');
+        }
+    </script>
 }
