@@ -205,13 +205,15 @@ public class PrinterDiscoveryService : BackgroundService
             if (printer.Status == PrinterStatus.Printing)
             {
                 var printJob = await client.GetPrintJobStatusAsync(printer.IpAddress, cancellationToken);
+
                 if (printJob != null)
                     printer.CurrentJob = new PrintJob
                     {
                         Name = printJob.Name ?? "Unknown",
                         ProgressPercentage = (int)(printJob.Progress * 100),
                         TimeElapsed = TimeSpan.FromSeconds(printJob.TimeElapsed),
-                        TimeRemaining = TimeSpan.FromSeconds(Math.Max(0, printJob.TimeTotal - printJob.TimeElapsed))
+                        TimeRemaining = TimeSpan.FromSeconds(Math.Max(0, printJob.TimeTotal - printJob.TimeElapsed)),
+                        State = MapJobState(printJob.State)
                     };
             }
             else
@@ -236,6 +238,21 @@ public class PrinterDiscoveryService : BackgroundService
             "error" => PrinterStatus.Error,
             "maintenance" => PrinterStatus.Maintenance,
             _ => PrinterStatus.Offline
+        };
+    }
+
+    private static JobState MapJobState(string jobState)
+    {
+        return jobState.ToLowerInvariant() switch
+        {
+            "pre_print" => JobState.Preparing,
+            "printing" => JobState.Printing,
+            "pausing" => JobState.Pausing,
+            "paused" => JobState.Paused,
+            "resuming" => JobState.Resuming,
+            "post_print" => JobState.PostPrint,
+            "wait_cleanup" => JobState.WaitCleanup,
+            _ => JobState.NoJob
         };
     }
 }

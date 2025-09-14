@@ -58,7 +58,8 @@ public class UltimakerApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                return JsonSerializer.Deserialize<UltimakerPrintJobStatus>(json, _jsonOptions);
+                var result = JsonSerializer.Deserialize<UltimakerPrintJobStatus>(json, _jsonOptions);
+                return result;
             }
 
             return null;

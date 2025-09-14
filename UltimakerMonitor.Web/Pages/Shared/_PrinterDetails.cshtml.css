@@ -1,0 +1,79 @@
+﻿/* Polaroid wrapper */
+.polaroid {
+    background: #fff; /* classic white frame */
+    border: 1px solid #e9e9e9;
+    border-radius: 8px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .40), 0 6px 14px rgba(0, 0, 0, .28);
+    color: #222; /* caption color */
+    display: inline-block;
+    max-width: 80%;
+    padding: 10px 10px 38px 10px; /* thicker bottom = polaroid edge */
+    transform: rotate(-1.25deg); /* subtle tilt */
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+/* Optional alternate tilt */
+
+.polaroid.tilt-right { transform: rotate(1.25deg); }
+
+/* Lift a bit on hover/focus */
+
+.polaroid:hover,
+.polaroid:focus-within {
+    box-shadow: 0 22px 48px rgba(0, 0, 0, .45), 0 8px 18px rgba(0, 0, 0, .32);
+    transform: rotate(0deg) translateY(-2px);
+}
+
+/* The photo inside */
+
+.polaroid-photo {
+    border: 1px solid rgba(0, 0, 0, .06);
+    border-radius: 6px; /* soft corners for the photo */
+    display: block;
+    height: auto;
+    width: 100%;
+}
+
+/* Caption */
+
+.polaroid figcaption {
+    bottom: 10px; /* sits in the thicker bottom edge */
+    color: #444;
+    font-size: .9rem;
+    left: 0;
+    line-height: 1.25;
+    padding: 0 10px;
+    pointer-events: none; /* clicks pass through to image if needed */
+    position: absolute;
+    right: 0;
+    text-align: center;
+}
+
+/* Positioning context for caption */
+
+.polaroid { position: relative; }
+
+/* Dark theme tweaks while keeping white frame */
+
+@media (prefers-color-scheme: dark) {
+    .polaroid {
+        border-color: #2b2b2b;
+        box-shadow: 0 22px 48px rgba(0, 0, 0, .65), 0 8px 18px rgba(0, 0, 0, .55);
+        color: #ddd;
+    }
+
+    .polaroid-photo { border-color: rgba(255, 255, 255, .08); }
+
+    .polaroid figcaption { color: #bbb; }
+}
+
+/* Respect reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+    .polaroid {
+        transform: none;
+        transition: none;
+    }
+
+    .polaroid:hover, .polaroid:focus-within { transform: none; }
+}

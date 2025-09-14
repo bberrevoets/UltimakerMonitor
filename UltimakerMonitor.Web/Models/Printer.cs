@@ -36,4 +36,17 @@ public class PrintJob
     public int ProgressPercentage { get; set; }
     public TimeSpan? TimeElapsed { get; set; }
     public TimeSpan? TimeRemaining { get; set; }
+    public JobState State { get; set; }
+}
+
+public enum JobState
+{
+    Preparing,
+    Printing,
+    Pausing,
+    Paused,
+    Resuming,
+    PostPrint,
+    WaitCleanup,
+    NoJob
 }

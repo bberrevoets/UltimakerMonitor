@@ -37,6 +37,7 @@ public class IndexModel : PageModel
         try
         {
             Printers = await _printerApiClient.GetPrintersAsync();
+
             return Partial("_PrinterList", Printers);
         }
         catch (Exception ex)
@@ -51,6 +52,7 @@ public class IndexModel : PageModel
         try
         {
             var printer = await _printerApiClient.GetPrinterAsync(id);
+
             if (printer == null) return Content("<div class='alert alert-warning'>Printer not found</div>");
 
             return Partial("_PrinterDetails", printer);

@@ -21,7 +21,7 @@
 				<tr>
 					<th>Status:</th>
 					<td>
-						<span class="badge bg-@GetStatusColor(Model.Status)">@Model.Status</span>
+						<span class="badge rounded-pill text-bg-@GetStatusColor(Model.Status)">@Model.Status</span>
 					</td>
 				</tr>
 				<tr>
@@ -29,8 +29,6 @@
 					<td>@Model.LastSeen.ToString("g")</td>
 				</tr>
 			</table>
-		</div>
-		<div class="col-md-6">
 			<h5>Temperature Information</h5>
 			<table class="table table-sm">
 				<tr>
@@ -61,6 +59,18 @@
 					</tr>
 				}
 			</table>
+		</div>
+		<div class="col-md-6">
+			<figure class="polaroid tilt-right">
+				<img
+					class="polaroid-photo"
+					src="/api/camera/stream?host=@Model.IpAddress"
+					alt="Camera for @Model.Name (@Model.IpAddress)"/>
+				<figcaption>
+					@Model.Name <span class="text-muted">(@Model.IpAddress)</span>
+				</figcaption>
+			</figure>
+
 		</div>
 	</div>
 
@@ -95,6 +105,12 @@
 						<th>Time Remaining:</th>
 						<td>@(Model.CurrentJob.TimeRemaining?.ToString(@"hh\:mm\:ss") ?? "N/A")</td>
 					</tr>
+					<tr>
+						<th>State:</th>
+						<td>
+							<span class="badge rounded-pill text-bg-@GetJobStateColor(Model.CurrentJob.State)">@Model.CurrentJob.State</span>
+						</td>
+					</tr>
 				</table>
 			</div>
 		</div>
@@ -113,6 +129,22 @@
 			PrinterStatus.Error => "danger",
 			PrinterStatus.Offline => "secondary",
 			PrinterStatus.Maintenance => "info",
+			_ => "secondary"
+		};
+	}
+
+	private string GetJobStateColor(JobState status)
+	{
+		return status switch
+		{
+			JobState.Preparing => "info",
+			JobState.Printing => "primary",
+			JobState.Pausing => "success",
+			JobState.Paused => "warning",
+			JobState.Resuming => "success",
+			JobState.PostPrint => "success",
+			JobState.WaitCleanup => "info",
+
 			_ => "secondary"
 		};
 	}
