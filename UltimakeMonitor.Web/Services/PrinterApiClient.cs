@@ -32,7 +32,8 @@ public class PrinterApiClient
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<Printer>($"/api/printers/{id}");
+            var response = await _httpClient.GetFromJsonAsync<Printer>($"/api/printers/{id}");
+            return response;
         }
         catch (Exception ex)
         {

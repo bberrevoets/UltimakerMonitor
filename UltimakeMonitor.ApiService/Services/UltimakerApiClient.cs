@@ -113,7 +113,9 @@ public class UltimakerPrintJobStatus
     public string State { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public double Progress { get; set; }
+    [JsonPropertyName("time_elapsed")]
     public int TimeElapsed { get; set; }
+    [JsonPropertyName("time_total")]
     public int TimeTotal { get; set; }
 }
 
