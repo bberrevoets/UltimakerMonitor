@@ -11,6 +11,9 @@ public class Printer
     public List<NozzleInfo> Nozzles { get; set; } = new();
     public PrintJob? CurrentJob { get; set; }
     public DateTime LastSeen { get; set; }
+
+
+    public bool IsSimulated { get; set; } = false;
 }
 
 public class NozzleInfo

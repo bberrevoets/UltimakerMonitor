@@ -13,12 +13,6 @@
 <div class="container mt-4">
 	<div class="d-flex justify-content-between align-items-center mb-3">
 		<h2>Printers</h2>
-		<div>
-			<button class="btn btn-sm btn-secondary" onclick="toggleAutoRefresh()">
-				<span id="autoRefreshIcon">⏸️</span> Auto-refresh: <span id="autoRefreshStatus">ON</span>
-			</button>
-			<button class="btn btn-sm btn-primary" onclick="refreshPrinters()">🔄 Refresh Now</button>
-		</div>
 	</div>
 
 	<div id="printersContainer">
@@ -45,7 +39,7 @@
 									<strong>Bed:</strong> @(printer.BedTemperature?.ToString("F1") ?? "N/A")°C<br/>
 									@if (printer.Nozzles.Any())
 									{
-										@foreach (var nozzle in printer.Nozzles)
+										@foreach (var nozzle in Model.Printers.First(p => p.Id == printer.Id).Nozzles)
 										{
 											<span>
 												<strong>Nozzle @(nozzle.Index + 1):</strong> @(nozzle.Temperature?.ToString("F1") ?? "N/A")°C<br/>
@@ -116,127 +110,117 @@
 				</div>
 			</div>
 			<div class="modal-footer">
-				<small class="me-auto text-muted">Auto-refreshing every 3 seconds</small>
+				<!-- Removed auto-refresh notice -->
 				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-				<button type="button" class="btn btn-primary" onclick="refreshPrinterDetails()">Refresh</button>
 			</div>
 		</div>
 	</div>
 </div>
 
-@functions {
-
-
-}
-
 @section Scripts {
 	<script>
 		let currentPrinterId = null;
-		let autoRefreshEnabled = true;
-		let refreshInterval = null;
-		let modalRefreshInterval = null;
-		let modalAutoRefreshEnabled = true;
-		
-		const connection = new signalR.HubConnectionBuilder()
-			.withUrl("/hubs/printers")
-			.withAutomaticReconnect()
-			.build();
 
-		connection.on("PrintersSnapshot", (printers) => {
-			// Full list => (re)render the grid
-			// renderAllPrinters(printers);
-			console.log("Getting Snapshot:", printers);
-		});
+// --- cache of latest printer payloads (for instant modal sync) ---
+		const printersById = Object.create(null);
 
-		connection.on("PrinterAdded", (printer) => {
-			// upsertPrinterCard(printer);   // create if missing
-			console.log("Printer added:", printer);
-		});
+		function getId(p) { return (p?.Id ?? p?.id) ?? null; }
 
-		connection.on("PrinterChanged", (printer) => {
-			// Upsert one printer card in the grid
-			// upsertPrinterCard(printer);
-			console.log("Printer changed:", printer);
-		});
+		function upsertPrinter(p) {
+			const id = getId(p);
+			if (id == null) return;
+			printersById[id] = { ...(printersById[id] || {}), ...p };
+		}
 
-		connection.on("PrinterRemoved", (id) => {
-			// Remove one printer card from the grid
-			// removePrinterCard(id);
-			console.log("Printer removed:", id);
-		});
-		
-		connection.start()
-			.then(() => connection.invoke("RequestSnapshot"))
-			.then(() => console.log("SignalR connected, snapshot requested"))
-			.catch(err => console.error("SignalR connection error:", err));
+		function removePrinter(id) { if (id != null) delete printersById[id]; }
 
-		connection.onreconnected((_id) => {
-			console.log("Reconnected, requesting snapshot:", _id);
-			connection.invoke("RequestSnapshot");
-		});
+// SignalR connection (keep if you use push elsewhere)
+		const connection = window.signalR
+			? new signalR.HubConnectionBuilder().withUrl("/hubs/printers").withAutomaticReconnect().build()
+			: null;
 
-		////////////////////////////////////////////////////////////////////////////////////////////
+		if (connection) {
+			connection.on("PrintersSnapshot",
+				(printers) => {
+					console.log("Snapshot received:", printers);
+					if (Array.isArray(printers)) for (const p of printers) upsertPrinter(p);
+					refreshPrinters();
+				});
 
-		// Start auto-refresh when page loads
-		window.addEventListener('load',
-			function() {
-				startAutoRefresh();
+			connection.on("PrinterAdded",
+				(printer) => {
+					console.log("Printer added:", printer);
+					upsertPrinter(printer);
+					refreshPrinters();
+				});
+
+			connection.on("PrinterChanged",
+				(printer) => {
+					console.log("Printer changed:", printer);
+					upsertPrinter(printer);
+					updatePrinter(printer);
+					updateModalIfShownForPrinter(printer);
+				});
+
+			connection.on("PrinterRemoved",
+				(id) => {
+					console.log("Printer removed:", id);
+					removePrinter?.(id); // if you're maintaining the local cache
+					closeModalIfShowingPrinter(id);
+					refreshPrinters();
+				});
+
+
+			connection.start()
+				.then(() => connection.invoke("RequestSnapshot"))
+				.catch(err => console.error("SignalR connection error:", err));
+
+			connection.onreconnected((_id) => {
+				connection.invoke("RequestSnapshot");
 			});
+		}
 
-		// Listen for modal events
-		document.getElementById('printerDetailsModal').addEventListener('shown.bs.modal',
-			function() {
-				startModalAutoRefresh();
-			});
+		function closeModalIfShowingPrinter(removedId) {
+			try {
+				if (currentPrinterId == null) return;
 
-		document.getElementById('printerDetailsModal').addEventListener('hidden.bs.modal',
-			function() {
-				stopModalAutoRefresh();
-			});
+				// Compare loosely; ids may be numbers or strings
+				if (String(currentPrinterId) !== String(removedId)) return;
 
-		function startAutoRefresh() {
-			if (autoRefreshEnabled && !refreshInterval) {
-				refreshInterval = setInterval(refreshPrinters, 5000); // Refresh every 5 seconds
+				const modalEl = document.getElementById('printerDetailsModal');
+				if (!modalEl) {
+					currentPrinterId = null;
+					return;
+				}
+
+				// Close the modal (Bootstrap 5 safe)
+				const modal =
+					(bootstrap.Modal.getInstance && bootstrap.Modal.getInstance(modalEl)) ||
+					(bootstrap.Modal.getOrCreateInstance
+						? bootstrap.Modal.getOrCreateInstance(modalEl)
+						: new bootstrap.Modal(modalEl));
+
+				// Only try to hide if it's actually shown
+				if (modalEl.classList.contains('show')) {
+					modal.hide();
+				}
+
+				// Optional: reset content back to a spinner so it’s clean next time
+				const contentDiv = document.getElementById('printerDetailsContent');
+				if (contentDiv) {
+					contentDiv.innerHTML =
+						'<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+				}
+
+				currentPrinterId = null;
+			} catch (err) {
+				console.error('Error closing modal after printer removal:', err);
+				currentPrinterId = null; // make sure we don’t keep a stale id
 			}
 		}
 
-		function stopAutoRefresh() {
-			if (refreshInterval) {
-				clearInterval(refreshInterval);
-				refreshInterval = null;
-			}
-		}
 
-		function startModalAutoRefresh() {
-			if (modalAutoRefreshEnabled && !modalRefreshInterval && currentPrinterId) {
-				modalRefreshInterval = setInterval(() => {
-						if (currentPrinterId) {
-							loadPrinterDetails(currentPrinterId, true); // true = silent refresh
-						}
-					},
-					3000); // Refresh modal every 3 seconds
-			}
-		}
-
-		function stopModalAutoRefresh() {
-			if (modalRefreshInterval) {
-				clearInterval(modalRefreshInterval);
-				modalRefreshInterval = null;
-			}
-		}
-
-		function toggleAutoRefresh() {
-			autoRefreshEnabled = !autoRefreshEnabled;
-			document.getElementById('autoRefreshStatus').textContent = autoRefreshEnabled ? 'ON' : 'OFF';
-			document.getElementById('autoRefreshIcon').textContent = autoRefreshEnabled ? '⏸️' : '▶️';
-
-			if (autoRefreshEnabled) {
-				startAutoRefresh();
-			} else {
-				stopAutoRefresh();
-			}
-		}
-
+// Manual refresh of the printers grid (no timers)
 		async function refreshPrinters() {
 			try {
 				const response = await fetch('/Index?handler=PrinterList');
@@ -249,11 +233,20 @@
 			}
 		}
 
-		function showPrinterDetails(printerId) {
+// Open modal and immediately sync with cached data after loading the partial
+		async function showPrinterDetails(printerId) {
 			currentPrinterId = printerId;
 			const modal = new bootstrap.Modal(document.getElementById('printerDetailsModal'));
 			modal.show();
-			loadPrinterDetails(printerId);
+
+			// 1) Load server-rendered partial (structure)
+			await loadPrinterDetails(printerId, /*silent*/ false);
+
+			// 2) Apply freshest values we already have locally (no network)
+			const cached = printersById[printerId];
+			if (cached) {
+				updateModalIfShownForPrinter(cached);
+			}
 		}
 
 		function refreshPrinterDetails() {
@@ -265,7 +258,6 @@
 		async function loadPrinterDetails(printerId, silent = false) {
 			const contentDiv = document.getElementById('printerDetailsContent');
 
-			// Only show spinner on initial load or manual refresh
 			if (!silent) {
 				contentDiv.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
 			}
@@ -274,11 +266,12 @@
 				const response = await fetch(`/Index?handler=PrinterDetails&id=${printerId}`);
 				if (response.ok) {
 					const html = await response.text();
-
-					// Only update if content has changed (to avoid flicker)
 					if (contentDiv.innerHTML !== html) {
 						contentDiv.innerHTML = html;
 					}
+					// Immediately sync with any cached data
+					const cached = printersById[printerId];
+					if (cached) updateModalIfShownForPrinter(cached);
 				} else if (!silent) {
 					contentDiv.innerHTML = '<div class="alert alert-danger">Failed to load printer details</div>';
 				}
@@ -295,13 +288,392 @@
 				const response = await fetch('/api/printers/discover', { method: 'POST' });
 				if (response.ok) {
 					alert('Printer discovery initiated!');
-					setTimeout(refreshPrinters, 1000); // Refresh after 1 second
 				} else {
 					alert('Failed to initiate printer discovery');
 				}
 			} catch (error) {
 				console.error('Error discovering printers:', error);
 				alert('Error discovering printers');
+			}
+		}
+
+// ---- Enums (must match C#) ----
+		const PrinterStatus = { Idle: 0, Printing: 1, Paused: 2, Error: 3, Offline: 4, Maintenance: 5 };
+		const JobState = { Preparing: 0, Printing: 1, Pausing: 2, Paused: 3, Resuming: 4, PostPrint: 5, WaitCleanup: 6, NoJob: 7 };
+
+// ---- Helpers (mirror C# exactly) ----
+		function statusColor(status) {
+			switch (Number(status)) {
+			case PrinterStatus.Idle:
+				return "success";
+			case PrinterStatus.Printing:
+				return "primary";
+			case PrinterStatus.Paused:
+				return "warning";
+			case PrinterStatus.Error:
+				return "danger";
+			case PrinterStatus.Offline:
+				return "secondary";
+			case PrinterStatus.Maintenance:
+				return "info";
+			default:
+				return "secondary";
+			}
+		}
+
+		function printerStatusLabel(status) {
+			switch (Number(status)) {
+			case PrinterStatus.Idle:
+				return "Idle";
+			case PrinterStatus.Printing:
+				return "Printing";
+			case PrinterStatus.Paused:
+				return "Paused";
+			case PrinterStatus.Error:
+				return "Error";
+			case PrinterStatus.Offline:
+				return "Offline";
+			case PrinterStatus.Maintenance:
+				return "Maintenance";
+			default:
+				return "Unknown";
+			}
+		}
+
+		function jobStateColor(state) {
+			switch (Number(state)) {
+			case JobState.Preparing:
+				return "info";
+			case JobState.Printing:
+				return "primary";
+			case JobState.Pausing:
+				return "success";
+			case JobState.Paused:
+				return "warning";
+			case JobState.Resuming:
+				return "success";
+			case JobState.PostPrint:
+				return "success";
+			case JobState.WaitCleanup:
+				return "info";
+			default:
+				return "secondary";
+			}
+		}
+
+		function jobStateLabel(state) {
+			switch (Number(state)) {
+			case JobState.Preparing:
+				return "Preparing";
+			case JobState.Printing:
+				return "Printing";
+			case JobState.Pausing:
+				return "Pausing";
+			case JobState.Paused:
+				return "Paused";
+			case JobState.Resuming:
+				return "Resuming";
+			case JobState.PostPrint:
+				return "Finishing";
+			case JobState.WaitCleanup:
+				return "Awaiting Cleanup";
+			case JobState.NoJob:
+				return "No Job";
+			default:
+				return "Unknown";
+			}
+		}
+
+		function fmtTemp(val) {
+			if (val === null || val === undefined) return 'N/A';
+			const n = Number(val);
+			if (Number.isNaN(n)) return 'N/A';
+			return n.toFixed(1);
+		}
+
+		function fmtPct(val) {
+			return Math.max(0, Math.min(100, Number(val) || 0));
+		}
+
+		function fmtDate(d) {
+			try {
+				return new Date(d).toLocaleString();
+			} catch (error) {
+				return d || '';
+			}
+		}
+
+		function getProp(obj, name) {
+			if (!obj) return undefined;
+			if (name in obj) return obj[name];
+			const camel = name.charAt(0).toLowerCase() + name.slice(1);
+			if (camel in obj) return obj[camel];
+			const pascal = name.charAt(0).toUpperCase() + name.slice(1);
+			if (pascal in obj) return obj[pascal];
+			return undefined;
+		}
+
+		function encodeAttr(x) { return String(x ?? '').replace(/"/g, '&quot;'); }
+
+		function setTextAll(root, sel, val) {
+			if (val == null) return;
+			root.querySelectorAll(sel).forEach(el => { el.textContent = String(val); });
+		}
+
+// Robust HH:MM:SS formatter.
+// Accepts numbers (seconds), "hh:mm:ss", numeric strings, or ISO-8601 like "PT25M10S".
+		function fmtHms(v) {
+			if (v == null) return 'N/A';
+
+			// Already "hh:mm:ss"?
+			if (typeof v === 'string' && /^\d{1,2}:\d{2}:\d{2}$/.test(v)) return v;
+
+			let secs;
+			if (typeof v === 'number' && isFinite(v)) {
+				secs = Math.max(0, Math.floor(v));
+			} else if (typeof v === 'string') {
+				const n = Number(v);
+				if (!Number.isNaN(n)) {
+					secs = Math.max(0, Math.floor(n));
+				} else {
+					// Try ISO-8601 "PT#H#M#S"
+					const m = v.match(/^P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)$/i);
+					if (m) {
+						const h = Number(m[1] || 0), min = Number(m[2] || 0), s = Number(m[3] || 0);
+						secs = h * 3600 + min * 60 + s;
+					} else {
+						return v; // fallback: show as-is
+					}
+				}
+			} else {
+				return 'N/A';
+			}
+
+			const h = Math.floor(secs / 3600);
+			const m = Math.floor((secs % 3600) / 60);
+			const s = secs % 60;
+			const pad = n => String(n).padStart(2, '0');
+			return `${pad(h)}:${pad(m)}:${pad(s)}`;
+		}
+
+
+// --- Nozzles shared renderer ---
+		function getNozzlesArray(printer) {
+			const arr = getProp(printer, 'Nozzles');
+			return Array.isArray(arr) ? arr : [];
+		}
+
+		function buildNozzlesHTML(nozzles, opts = {}) {
+			const { showTargets = true, cardMode = false } = opts;
+			if (!Array.isArray(nozzles) || nozzles.length === 0) {
+				return cardMode
+					? `<span><strong>Nozzle:</strong> N/A°C<br/></span>`
+					: `<div><strong>Nozzle:</strong> N/A°C</div>`;
+			}
+			return nozzles.map(nz => {
+				const idx = (Number(getProp(nz, 'Index')) || 0) + 1;
+				const t = fmtTemp(getProp(nz, 'Temperature'));
+				const target = Number(getProp(nz, 'TargetTemperature'));
+				const targetHtml = showTargets && target > 0 ? ` <span class="text-muted">(Target: ${target.toFixed(1)}°C)</span>` : '';
+				return cardMode
+					? `<span><strong>Nozzle ${idx}:</strong> ${t}°C${targetHtml}<br/></span>`
+					: `<div><strong>Nozzle ${idx}:</strong> ${t}°C${targetHtml}</div>`;
+			}).join('');
+		}
+
+		function applyNozzles(container, printer, opts = {}) {
+			if (!container) return;
+			const nozzles = getNozzlesArray(printer);
+			container.innerHTML = buildNozzlesHTML(nozzles, opts);
+		}
+
+// ---- renderer for the middle of the card (temps + job) ----
+		function renderTempsAndJob(printer) {
+			const ip = encodeAttr(getProp(printer, 'IpAddress') || getProp(printer, 'ip'));
+			const bed = fmtTemp(getProp(printer, 'BedTemperature'));
+			const nozzleLines = buildNozzlesHTML(getNozzlesArray(printer), { showTargets: false, cardMode: true });
+
+			let jobHtml = '';
+			const job = getProp(printer, 'CurrentJob');
+			if (job) {
+				const name = encodeAttr(getProp(job, 'Name'));
+				const pct = fmtPct(getProp(job, 'ProgressPercentage'));
+				const state = getProp(job, 'State');
+				jobHtml = `
+              <div class="mt-3">
+                <p class="mb-1"><strong>Current Job:</strong> ${name}</p>
+                <div class="progress">
+                  <div class="progress-bar" role="progressbar"
+                       style="width: ${pct}%"
+                       aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+                    ${pct}%
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <span class="badge rounded-pill text-bg-${jobStateColor(state)}">
+                    ${jobStateLabel(state)}
+                  </span>
+                </div>
+              </div>`;
+			}
+
+			return `
+            <p class="card-text">
+              <strong>IP:</strong> ${ip}<br/>
+              <strong>Bed:</strong> ${bed}°C<br/>
+              ${nozzleLines}
+            </p>
+            ${jobHtml}
+          `;
+		}
+
+// ---- update the printer card in-place ----
+		async function updatePrinter(printer) {
+			const id = getProp(printer, 'Id');
+			if (!id) return;
+
+			const card = document.querySelector(`.printer-card[data-printer-id="${id}"]`);
+			if (!card) {
+				console.debug('Card not found for printer id', id, '— refreshing grid.');
+				refreshPrinters?.();
+				return;
+			}
+
+			// Header: name + model
+			const titleEl = card.querySelector('.card-header .card-title');
+			const modelEl = card.querySelector('.card-header .text-muted');
+			const name = getProp(printer, 'Name');
+			const model = getProp(printer, 'Model');
+			if (titleEl && name != null) titleEl.textContent = name;
+			if (modelEl && model != null) modelEl.textContent = model;
+
+			// Body: status badge (first .mb-2 .badge)
+			const body = card.querySelector('.card-body');
+			if (body) {
+				const mb2 = body.querySelector('.mb-2');
+				const statusBadge = mb2 ? mb2.querySelector('.badge') : null;
+				const status = getProp(printer, 'Status');
+				if (statusBadge && status != null) {
+					statusBadge.className = `badge rounded-pill text-bg-${statusColor(status)}`;
+					statusBadge.textContent = printerStatusLabel(status);
+				}
+
+				// If you want to refresh the camera still, uncomment below (may not be needed for stream)
+				// const img = body.querySelector('.mb-2 img.polaroid-photo');
+				// const ip = getProp(printer, 'IpAddress');
+				// if (img && ip) {
+				//   img.src = `/api/camera/stream?host=${encodeURIComponent(ip)}&t=${Date.now()}`;
+				//   img.alt = `Camera for ${name ?? ''} (${ip})`;
+				// }
+
+				// Rebuild temps + job section after the .mb-2 block
+				const afterMb2Html = renderTempsAndJob(printer);
+				if (mb2) {
+					let n = mb2.nextSibling;
+					const toRemove = [];
+					while (n) {
+						toRemove.push(n);
+						n = n.nextSibling;
+					}
+					toRemove.forEach(x => x.remove());
+					mb2.insertAdjacentHTML('afterend', afterMb2Html);
+				}
+			}
+
+			// Footer: last seen
+			const footer = card.querySelector('.card-footer');
+			const lastSeen = getProp(printer, 'LastSeen');
+			if (footer && lastSeen) {
+				footer.textContent = `Last seen: ${fmtDate(lastSeen)}`;
+			}
+		}
+
+// ---- live-update the modal (no fetch) if it is open for this printer ----
+		function updateModalIfShownForPrinter(printer) {
+			try {
+				const id = getProp(printer, "Id");
+				if (!id) return;
+
+				const modalEl = document.getElementById("printerDetailsModal");
+				const isVisible = modalEl && modalEl.classList.contains("show");
+				if (!isVisible || String(currentPrinterId) !== String(id)) return;
+
+				const content = document.getElementById("printerDetailsContent");
+				if (!content) return;
+
+				const name = getProp(printer, "Name");
+				const model = getProp(printer, "Model");
+				const ip = getProp(printer, "IpAddress");
+				const status = getProp(printer, "Status");
+				const last = getProp(printer, "LastSeen");
+				const job = getProp(printer, "CurrentJob");
+				const bed = getProp(printer, "BedTemperature");
+
+				const q = (sel) => content.querySelector(sel);
+
+				// Optional: modal title
+				const titleEl = document.getElementById("printerDetailsModalLabel");
+				if (titleEl && name) titleEl.textContent = `Printer Details – ${name}`;
+
+				// General info — update ALL duplicates (table + figcaption)
+				setTextAll(content, '[data-field="name"]', name);
+				setTextAll(content, '[data-field="model"]', model);
+				setTextAll(content, '[data-field="ip"]', ip);
+
+				const lastSeenText = fmtDate(last);
+				setTextAll(content, '[data-field="last-seen"]', lastSeenText);
+
+				// Status badge (scoped)
+				const statusBadge = q('[data-field="status-badge"]');
+				if (statusBadge && status != null) {
+					statusBadge.className = `badge rounded-pill text-bg-${statusColor(status)}`;
+					statusBadge.textContent = printerStatusLabel(status);
+				}
+
+				// Camera (optional: refresh still and alt)
+				const camImg = content.querySelector('[data-field="camera"] img') || content.querySelector('img.polaroid-photo');
+				if (camImg && ip) {
+					// cache-bust stills; may be unnecessary for a live stream
+					camImg.alt = `Camera for ${name ?? ''} (${ip})`;
+					// camImg.src = `/api/camera/stream?host=${encodeURIComponent(ip)}&t=${Date.now()}`;
+				}
+
+				// Temperatures
+				setTextAll(content, '[data-field="bed-temp"]', fmtTemp(bed));
+				const nozContainer = q('[data-field="nozzles"]');
+				applyNozzles(nozContainer, printer, { showTargets: true, cardMode: false });
+
+				// Current job
+				setTextAll(content, '[data-field="job-name"]', job ? getProp(job, 'Name') : '');
+
+				const pb = q('[data-field="job-progress"]');
+				if (pb) {
+					const pct = fmtPct(job ? getProp(job, 'ProgressPercentage') : 0);
+					pb.style.width = `${pct}%`;
+					pb.setAttribute('aria-valuenow', String(pct));
+					pb.textContent = `${pct}%`;
+				}
+
+				// NEW: keep elapsed/remaining fresh immediately
+				const elapsed = job ? getProp(job, 'TimeElapsed') : null;
+				const remain = job ? getProp(job, 'TimeRemaining') : null;
+				setTextAll(content, '[data-field="job-time-elapsed"]', fmtHms(elapsed));
+				setTextAll(content, '[data-field="job-time-remaining"]', fmtHms(remain));
+
+				const jobBadge = q('[data-field="job-state-badge"]');
+				if (jobBadge) {
+					if (job) {
+						const st = getProp(job, 'State');
+						jobBadge.className = `badge rounded-pill text-bg-${jobStateColor(st)}`;
+						jobBadge.textContent = jobStateLabel(st);
+						jobBadge.style.display = '';
+					} else {
+						jobBadge.textContent = 'No Job';
+						jobBadge.className = 'badge rounded-pill text-bg-secondary';
+					}
+				}
+			} catch (err) {
+				console.error('updateModalIfShownForPrinter error:', err);
 			}
 		}
 	</script>

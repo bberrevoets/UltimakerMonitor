@@ -37,7 +37,7 @@
 /* Caption */
 
 .polaroid figcaption {
-    bottom: 10px; /* sits in the thicker bottom edge */
+    bottom: 2px; /* sits in the thicker bottom edge */
     color: #444;
     font-size: .9rem;
     left: 0;

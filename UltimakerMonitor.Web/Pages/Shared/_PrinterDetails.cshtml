@@ -2,117 +2,137 @@
 @model UltimakerMonitor.Web.Models.Printer
 
 <div class="container-fluid">
-	<div class="row">
-		<div class="col-md-6">
-			<h5>General Information</h5>
-			<table class="table table-sm">
-				<tr>
-					<th>Name:</th>
-					<td>@Model.Name</td>
-				</tr>
-				<tr>
-					<th>Model:</th>
-					<td>@Model.Model</td>
-				</tr>
-				<tr>
-					<th>IP Address:</th>
-					<td>@Model.IpAddress</td>
-				</tr>
-				<tr>
-					<th>Status:</th>
-					<td>
-						<span class="badge rounded-pill text-bg-@Helpers.GetStatusColor(Model.Status)">@Model.Status</span>
-					</td>
-				</tr>
-				<tr>
-					<th>Last Seen:</th>
-					<td>@Model.LastSeen.ToString("g")</td>
-				</tr>
-			</table>
-			<h5>Temperature Information</h5>
-			<table class="table table-sm">
-				<tr>
-					<th>Bed Temperature:</th>
-					<td>@(Model.BedTemperature?.ToString("F1") ?? "N/A")°C</td>
-				</tr>
-				@if (Model.Nozzles.Any())
-				{
-					@foreach (var nozzle in Model.Nozzles)
-					{
-						<tr>
-							<th>Nozzle @(nozzle.Index + 1) Temperature:</th>
-							<td>
-								@(nozzle.Temperature?.ToString("F1") ?? "N/A")°C
-								@if (nozzle.TargetTemperature.HasValue && nozzle.TargetTemperature > 0)
-								{
-									<span class="text-muted">(Target: @nozzle.TargetTemperature.Value.ToString("F1")°C)</span>
-								}
-							</td>
-						</tr>
-					}
-				}
-				else
-				{
-					<tr>
-						<th>Nozzle Temperature:</th>
-						<td>N/A</td>
-					</tr>
-				}
-			</table>
-		</div>
-		<div class="col-md-6">
-			<figure class="polaroid tilt-right">
-				<img
-					class="polaroid-photo"
-					src="/api/camera/stream?host=@Model.IpAddress"
-					alt="Camera for @Model.Name (@Model.IpAddress)"/>
-				<figcaption>
-					@Model.Name <span class="text-muted">(@Model.IpAddress)</span>
-				</figcaption>
-			</figure>
+    <!-- Top row: Info (left) + Image (right) -->
+    <div class="row g-4">
+        <div class="col-md-6">
+            <h5>General Information</h5>
+            <table class="table table-sm">
+                <tr>
+                    <th>Name:</th>
+                    <td><span data-field="name">@Model.Name</span></td>
+                </tr>
+                <tr>
+                    <th>Model:</th>
+                    <td><span data-field="model">@Model.Model</span></td>
+                </tr>
+                <tr>
+                    <th>IP Address:</th>
+                    <td><span data-field="ip">@Model.IpAddress</span></td>
+                </tr>
+                <tr>
+                    <th>Status:</th>
+                    <td>
+                        <span data-field="status-badge"
+                              class="badge rounded-pill text-bg-@Helpers.GetStatusColor(Model.Status)">
+                            @* Text will be replaced by JS anyway *@
+                            @Model.Status
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Last Seen:</th>
+                    <td><span data-field="last-seen">@Model.LastSeen.ToString("g")</span></td>
+                </tr>
+            </table>
+        </div>
 
-		</div>
-	</div>
+        <div class="col-md-6">
+            <figure class="polaroid tilt-right" data-field="camera">
+                <img class="polaroid-photo"
+                     src="/api/camera/stream?host=@Model.IpAddress"
+                     alt="Camera for @Model.Name (@Model.IpAddress)" />
+                <figcaption>
+                    <span data-field="name">@Model.Name</span>
+                    <span class="text-muted">(<span data-field="ip">@Model.IpAddress</span>)</span>
+                </figcaption>
+            </figure>
+        </div>
+    </div>
 
-	@if (Model.CurrentJob != null)
-	{
-		<div class="row mt-3">
-			<div class="col-12">
-				<h5>Current Print Job</h5>
-				<table class="table table-sm">
-					<tr>
-						<th>File Name:</th>
-						<td>@Model.CurrentJob.Name</td>
-					</tr>
-					<tr>
-						<th>Progress:</th>
-						<td>
-							<div class="progress" style="height: 25px;">
-								<div class="progress-bar" role="progressbar"
-								     style="width: @Model.CurrentJob.ProgressPercentage%"
-								     aria-valuenow="@Model.CurrentJob.ProgressPercentage"
-								     aria-valuemin="0" aria-valuemax="100">
-									@Model.CurrentJob.ProgressPercentage%
-								</div>
-							</div>
-						</td>
-					</tr>
-					<tr>
-						<th>Time Elapsed:</th>
-						<td>@(Model.CurrentJob.TimeElapsed?.ToString(@"hh\:mm\:ss") ?? "N/A")</td>
-					</tr>
-					<tr>
-						<th>Time Remaining:</th>
-						<td>@(Model.CurrentJob.TimeRemaining?.ToString(@"hh\:mm\:ss") ?? "N/A")</td>
-					</tr>
-					<tr>
-						<th>State:</th>
-						<td>
-							<span class="badge rounded-pill text-bg-@Helpers.GetJobStateColor(Model.CurrentJob.State)">@Model.CurrentJob.State</span>
-						</td>
-					</tr>
-				</table>
-			</div>
-		</div>
-	}
+    <!-- Full-width row BELOW the image: Temperature Information -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <h5>Temperature Information</h5>
+            <table class="table table-sm w-100">
+                <tr>
+                    <th>Bed Temperature:</th>
+                    <td><span data-field="bed-temp">@((Model.BedTemperature?.ToString("F1") ?? "N/A"))</span>°C</td>
+                </tr>
+
+                <tr>
+                    <th>Nozzles:</th>
+                    <td>
+                        <div data-field="nozzles">
+                            @* Initial server render; JS will rebuild this *@
+                            @if (Model.Nozzles?.Any() == true)
+                            {
+                                foreach (var nz in Model.Nozzles)
+                                {
+                                    <div>
+                                        <strong>Nozzle @(nz.Index + 1):</strong>
+                                        @(nz.Temperature?.ToString("F1") ?? "N/A")°C
+                                        @if (nz.TargetTemperature.HasValue && nz.TargetTemperature > 0)
+                                        {
+                                            <span class="text-muted">(Target: @nz.TargetTemperature.Value.ToString("F1")°C)</span>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div><strong>Nozzle:</strong> N/A°C</div>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    @if (Model.CurrentJob != null)
+    {
+        <div class="row mt-3">
+            <div class="col-12">
+                <h5>Current Print Job</h5>
+                <table class="table table-sm">
+                    <tr>
+                        <th>File Name:</th>
+                        <td><span data-field="job-name">@Model.CurrentJob.Name</span></td>
+                    </tr>
+                    <tr>
+                        <th>Progress:</th>
+                        <td>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar"
+                                     data-field="job-progress"
+                                     role="progressbar"
+                                     style="width:@Model.CurrentJob.ProgressPercentage%"
+                                     aria-valuenow="@Model.CurrentJob.ProgressPercentage"
+                                     aria-valuemin="0" aria-valuemax="100">
+                                    @Model.CurrentJob.ProgressPercentage%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Time Elapsed:</th>
+                        <td><span data-field="job-time-elapsed">@((Model.CurrentJob.TimeElapsed?.ToString(@"hh\:mm\:ss") ?? "N/A"))</span></td>
+                    </tr>
+                    <tr>
+                        <th>Time Remaining:</th>
+                        <td><span data-field="job-time-remaining">@((Model.CurrentJob.TimeRemaining?.ToString(@"hh\:mm\:ss") ?? "N/A"))</span></td>
+                    </tr>
+                    <tr>
+                        <th>State:</th>
+                        <td>
+                            <span data-field="job-state-badge"
+                                  class="badge rounded-pill text-bg-@Helpers.GetJobStateColor(Model.CurrentJob.State)">
+                                @Helpers.GetJobStateLabel(Model.CurrentJob.State)
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    }
 </div>

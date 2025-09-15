@@ -20,16 +20,6 @@ public class NozzleInfo
     public double? TargetTemperature { get; set; }
 }
 
-public enum PrinterStatus
-{
-    Idle,
-    Printing,
-    Paused,
-    Error,
-    Offline,
-    Maintenance
-}
-
 public class PrintJob
 {
     public string Name { get; set; } = string.Empty;
@@ -37,16 +27,4 @@ public class PrintJob
     public TimeSpan? TimeElapsed { get; set; }
     public TimeSpan? TimeRemaining { get; set; }
     public JobState State { get; set; }
-}
-
-public enum JobState
-{
-    Preparing,
-    Printing,
-    Pausing,
-    Paused,
-    Resuming,
-    PostPrint,
-    WaitCleanup,
-    NoJob
 }

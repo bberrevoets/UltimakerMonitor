@@ -1,6 +1,11 @@
-﻿using System.Collections.Concurrent;
-using Makaretu.Dns;
+﻿using Makaretu.Dns;
+
+using Microsoft.Extensions.Options;
+
+using System.Collections.Concurrent;
+
 using UltimakerMonitor.ApiService.Models;
+using UltimakerMonitor.ApiService.Options;
 
 namespace UltimakerMonitor.ApiService.Services;
 
@@ -11,12 +16,15 @@ public class PrinterDiscoveryService : BackgroundService
     private readonly ConcurrentDictionary<string, Printer> _printers = new();
     private readonly IServiceProvider _serviceProvider;
     private readonly TimeSpan _updateInterval = TimeSpan.FromSeconds(10);
-    private MulticastService? _mdns;
+    private MulticastService? _mdns; 
+    private readonly DiscoveryTestOptions _testOptions;
+    private readonly ConcurrentDictionary<string, DateTime> _simulatedExpiry = new();
 
-    public PrinterDiscoveryService(ILogger<PrinterDiscoveryService> logger, IServiceProvider serviceProvider)
+    public PrinterDiscoveryService(ILogger<PrinterDiscoveryService> logger, IServiceProvider serviceProvider, IOptions<DiscoveryTestOptions> testOptions)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _testOptions = testOptions.Value;
     }
 
     public IEnumerable<Printer> GetAllPrinters()
@@ -46,6 +54,26 @@ public class PrinterDiscoveryService : BackgroundService
         var discoveryTask = RunDiscoveryLoopAsync(discoveryTimer, stoppingToken);
         var updateTask = RunUpdateLoopAsync(updateTimer, stoppingToken);
 
+        Task? simulationTask = null;
+        if (_testOptions.EnableSimulation)
+        {
+            var simTimer = new PeriodicTimer(TimeSpan.FromSeconds(_testOptions.AddEverySeconds));
+            simulationTask = RunSimulationLoopAsync(simTimer, stoppingToken);
+        }
+
+        try
+        {
+            if (simulationTask is null)
+                await Task.WhenAll(discoveryTask, updateTask);
+            else
+                await Task.WhenAll(discoveryTask, updateTask, simulationTask);
+        }
+        finally
+        {
+            _mdns?.Stop();
+            _mdns?.Dispose();
+        }
+
         try
         {
             await Task.WhenAll(discoveryTask, updateTask);
@@ -56,6 +84,57 @@ public class PrinterDiscoveryService : BackgroundService
             _mdns?.Dispose();
         }
     }
+
+    private async Task RunSimulationLoopAsync(PeriodicTimer timer, CancellationToken ct)
+    {
+        var rnd = new Random();
+
+        while (await timer.WaitForNextTickAsync(ct))
+        {
+            try
+            {
+                // Pick a real printer (if any) to clone, otherwise synthesize
+                var real = _printers.Values.FirstOrDefault(p => !p.IsSimulated);
+                var id = Guid.NewGuid().ToString("N");
+                var nameSuffix = rnd.Next(100, 999);
+                var printer = new Printer
+                {
+                    Id = $"sim-{id}",
+                    Name = real is null ? $"Ultimaker SIM {nameSuffix}" : $"{real.Name} (SIM {nameSuffix})",
+                    IpAddress = "192.168.180.134",  // fixed address for simulated printer
+                    Model = real?.Model ?? "Ultimaker-SIM",
+                    Status = PrinterStatus.Printing,
+                    BedTemperature = (real?.BedTemperature ?? 60) + rnd.Next(-2, 3),
+                    LastSeen = DateTime.UtcNow,
+                    IsSimulated = true,
+                    Nozzles =
+                {
+                    new NozzleInfo { Index = 0, Temperature = 205 + rnd.Next(-3, 4), TargetTemperature = 210 },
+                    new NozzleInfo { Index = 1, Temperature = 0, TargetTemperature = 0 }
+                },
+                    CurrentJob = new PrintJob
+                    {
+                        Name = $"Dummy Job {nameSuffix}",
+                        ProgressPercentage = 0,
+                        TimeElapsed = TimeSpan.Zero,
+                        TimeRemaining = TimeSpan.FromMinutes(25),
+                        State = JobState.Printing
+                    }
+                };
+
+                _printers[printer.Id] = printer;
+                var expiry = DateTime.UtcNow.AddSeconds(_testOptions.LifetimeSeconds);
+                _simulatedExpiry[printer.Id] = expiry;
+
+                _logger.LogInformation("📦 Added simulated printer {Name} ({Id}) until {Expiry:u}", printer.Name, printer.Id, expiry);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Simulation loop failed to add a dummy printer");
+            }
+        }
+    }
+
 
     private void InitializeMdns()
     {
@@ -157,6 +236,24 @@ public class PrinterDiscoveryService : BackgroundService
 
     private async Task UpdatePrinterStatusesAsync(CancellationToken cancellationToken)
     {
+        // 6a) Remove expired simulated printers
+        var now = DateTime.UtcNow;
+        foreach (var kvp in _simulatedExpiry.ToArray())
+        {
+            if (kvp.Value <= now)
+            {
+                if (_printers.TryRemove(kvp.Key, out var removed))
+                {
+                    _simulatedExpiry.TryRemove(kvp.Key, out _);
+                    _logger.LogInformation("🗑️ Removed simulated printer {Name} ({Id})", removed.Name, removed.Id);
+                }
+                else
+                {
+                    _simulatedExpiry.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+
         using var scope = _serviceProvider.CreateScope();
         var ultimakerClient = scope.ServiceProvider.GetRequiredService<UltimakerApiClient>();
 
@@ -169,6 +266,12 @@ public class PrinterDiscoveryService : BackgroundService
     private async Task UpdatePrinterStatusAsync(Printer printer, UltimakerApiClient client,
         CancellationToken cancellationToken)
     {
+        if (printer.IsSimulated)
+        {
+            SimulatePrinterTick(printer);
+            return;
+        }
+
         try
         {
             // Get printer status
@@ -227,6 +330,52 @@ public class PrinterDiscoveryService : BackgroundService
             printer.Status = PrinterStatus.Offline;
         }
     }
+
+    private void SimulatePrinterTick(Printer p)
+    {
+        // simple state machine: mostly "Printing", then "PostPrint" near 100%, then back to "Idle"
+        p.LastSeen = DateTime.UtcNow;
+
+        if (p.CurrentJob == null)
+        {
+            p.Status = PrinterStatus.Idle;
+            return;
+        }
+
+        var progress = p.CurrentJob.ProgressPercentage + 3; // +3% each tick (~every 10s by your _updateInterval)
+        progress = Math.Min(progress, 100);
+
+        p.CurrentJob.ProgressPercentage = progress;
+        p.CurrentJob.TimeElapsed = (p.CurrentJob.TimeElapsed ?? TimeSpan.Zero).Add(TimeSpan.FromSeconds(_updateInterval.TotalSeconds));
+        var remaining = TimeSpan.FromMinutes(25) * (100 - progress) / 100.0;
+        p.CurrentJob.TimeRemaining = remaining;
+
+        // wiggle temps a bit
+        if (p.Nozzles.Count > 0)
+        {
+            var rnd = new Random();
+            p.Nozzles[0].Temperature = (p.Nozzles[0].Temperature ?? 205) + rnd.Next(-1, 2);
+        }
+        p.BedTemperature = (p.BedTemperature ?? 60) + (new Random().Next(-1, 2));
+
+        if (progress >= 100)
+        {
+            p.Status = PrinterStatus.Offline;
+            p.CurrentJob.State = JobState.PostPrint;
+            // small grace before it turns idle (until expiry removes it)
+            if (p.CurrentJob.TimeRemaining <= TimeSpan.FromSeconds(0))
+            {
+                p.Status = PrinterStatus.Idle;
+                p.CurrentJob = null;
+            }
+        }
+        else
+        {
+            p.Status = PrinterStatus.Printing;
+            p.CurrentJob.State = JobState.Printing;
+        }
+    }
+
 
     private static PrinterStatus MapPrinterStatus(string ultimakerStatus)
     {

@@ -1,3 +1,4 @@
+using UltimakerMonitor.ApiService.Options;
 using UltimakerMonitor.ApiService.Services;
 
 namespace UltimakerMonitor.ApiService;
@@ -7,6 +8,9 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.Configure<DiscoveryTestOptions>(builder.Configuration.GetSection("DiscoveryTest"));
+
         builder.AddServiceDefaults();
 
         // Add services to the container.

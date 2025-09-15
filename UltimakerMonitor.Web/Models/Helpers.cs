@@ -41,4 +41,25 @@
                 _ => "secondary"
             };
     }
+    public enum PrinterStatus
+    {
+        Idle,
+        Printing,
+        Paused,
+        Error,
+        Offline,
+        Maintenance
+    }
+
+    public enum JobState
+    {
+        Preparing,
+        Printing,
+        Pausing,
+        Paused,
+        Resuming,
+        PostPrint,
+        WaitCleanup,
+        NoJob
+    }
 }
