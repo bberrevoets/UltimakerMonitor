@@ -17,7 +17,7 @@
 							<img class="polaroid-photo"
 							     src="/api/camera/stream?host=@printer.IpAddress"
 							     alt="Camera for @printer.Name (@printer.IpAddress)"/>
-							<span class="badge rounded-pill text-bg-@GetStatusColor(printer.Status)">
+							<span class="badge rounded-pill text-bg-@Helpers.GetStatusColor(printer.Status)">
 								@printer.Status
 							</span>
 						</div>
@@ -56,8 +56,8 @@
 								</div>
 
 								<div class="mt-2">
-									<span class="badge rounded-pill text-bg-@GetJobStateColor(printer.CurrentJob.State)">
-										@GetJobStateLabel(printer.CurrentJob.State)
+									<span class="badge rounded-pill text-bg-@Helpers.GetJobStateColor(printer.CurrentJob.State)">
+										@Helpers.GetJobStateLabel(printer.CurrentJob.State)
 									</span>
 								</div>
 							</div>
@@ -78,52 +78,3 @@
 		</div>
 	}
 </div>
-
-@functions {
-
-	private static string GetJobStateLabel(JobState state)
-	{
-		return state switch
-		{
-			JobState.Preparing => "Preparing",
-			JobState.Printing => "Printing",
-			JobState.Pausing => "Pausing",
-			JobState.Paused => "Paused",
-			JobState.Resuming => "Resuming",
-			JobState.PostPrint => "Finishing",
-			JobState.WaitCleanup => "Awaiting Cleanup",
-			JobState.NoJob => "No Job",
-			_ => "Unknown"
-		};
-	}
-
-	private string GetStatusColor(PrinterStatus status)
-	{
-		return status switch
-		{
-			PrinterStatus.Idle => "success",
-			PrinterStatus.Printing => "primary",
-			PrinterStatus.Paused => "warning",
-			PrinterStatus.Error => "danger",
-			PrinterStatus.Offline => "secondary",
-			PrinterStatus.Maintenance => "info",
-			_ => "secondary"
-		};
-	}
-
-	private string GetJobStateColor(JobState status)
-	{
-		return status switch
-		{
-			JobState.Preparing => "info",
-			JobState.Printing => "primary",
-			JobState.Pausing => "success",
-			JobState.Paused => "warning",
-			JobState.Resuming => "success",
-			JobState.PostPrint => "success",
-			JobState.WaitCleanup => "info",
-			_ => "secondary"
-		};
-	}
-
-}

@@ -21,7 +21,7 @@
 				<tr>
 					<th>Status:</th>
 					<td>
-						<span class="badge rounded-pill text-bg-@GetStatusColor(Model.Status)">@Model.Status</span>
+						<span class="badge rounded-pill text-bg-@Helpers.GetStatusColor(Model.Status)">@Model.Status</span>
 					</td>
 				</tr>
 				<tr>
@@ -108,7 +108,7 @@
 					<tr>
 						<th>State:</th>
 						<td>
-							<span class="badge rounded-pill text-bg-@GetJobStateColor(Model.CurrentJob.State)">@Model.CurrentJob.State</span>
+							<span class="badge rounded-pill text-bg-@Helpers.GetJobStateColor(Model.CurrentJob.State)">@Model.CurrentJob.State</span>
 						</td>
 					</tr>
 				</table>
@@ -116,37 +116,3 @@
 		</div>
 	}
 </div>
-
-@functions {
-
-	private string GetStatusColor(PrinterStatus status)
-	{
-		return status switch
-		{
-			PrinterStatus.Idle => "success",
-			PrinterStatus.Printing => "primary",
-			PrinterStatus.Paused => "warning",
-			PrinterStatus.Error => "danger",
-			PrinterStatus.Offline => "secondary",
-			PrinterStatus.Maintenance => "info",
-			_ => "secondary"
-		};
-	}
-
-	private string GetJobStateColor(JobState status)
-	{
-		return status switch
-		{
-			JobState.Preparing => "info",
-			JobState.Printing => "primary",
-			JobState.Pausing => "success",
-			JobState.Paused => "warning",
-			JobState.Resuming => "success",
-			JobState.PostPrint => "success",
-			JobState.WaitCleanup => "info",
-
-			_ => "secondary"
-		};
-	}
-
-}

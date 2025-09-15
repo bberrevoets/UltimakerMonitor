@@ -1,4 +1,5 @@
 using System.Net;
+using UltimakerMonitor.Web.Hubs;
 using UltimakerMonitor.Web.Services;
 
 namespace UltimakerMonitor.Web;
@@ -14,6 +15,10 @@ public class Program
 
         // Add services to the container.
         builder.Services.AddRazorPages();
+
+        builder.Services.AddSignalR();
+        builder.Services.AddSingleton<PrinterStateStore>();
+        builder.Services.AddHostedService<PrinterUpdateService>();
 
         // Add HttpClient for API communication with service discovery
         builder.Services.AddHttpClient<PrinterApiClient>(client =>
@@ -140,6 +145,8 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseRouting();
+
+        app.MapHub<PrinterHub>("/hubs/printers");
 
         app.UseAuthorization();
 

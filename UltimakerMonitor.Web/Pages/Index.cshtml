@@ -35,7 +35,10 @@
 							</div>
 							<div class="card-body">
 								<div class="mb-2">
-									<span class="badge rounded-pill text-bg-@GetStatusColor(printer.Status)">@printer.Status</span>
+									<img class="polaroid-photo"
+									     src="/api/camera/stream?host=@printer.IpAddress"
+									     alt="Camera for @printer.Name (@printer.IpAddress)"/>
+									<span class="badge rounded-pill text-bg-@Helpers.GetStatusColor(printer.Status)">@printer.Status</span>
 								</div>
 								<p class="card-text">
 									<strong>IP:</strong> @printer.IpAddress<br/>
@@ -72,8 +75,8 @@
 										</div>
 
 										<div class="mt-2">
-											<span class="badge rounded-pill text-bg-@GetJobStateColor(printer.CurrentJob.State)">
-												@GetJobStateLabel(printer.CurrentJob.State)
+											<span class="badge rounded-pill text-bg-@Helpers.GetJobStateColor(printer.CurrentJob.State)">
+												@Helpers.GetJobStateLabel(printer.CurrentJob.State)
 											</span>
 										</div>
 									</div>
@@ -123,50 +126,6 @@
 
 @functions {
 
-	private static string GetJobStateLabel(JobState state)
-	{
-		return state switch
-		{
-			JobState.Preparing => "Preparing",
-			JobState.Printing => "Printing",
-			JobState.Pausing => "Pausing",
-			JobState.Paused => "Paused",
-			JobState.Resuming => "Resuming",
-			JobState.PostPrint => "Finishing",
-			JobState.WaitCleanup => "Awaiting Cleanup",
-			JobState.NoJob => "No Job",
-			_ => "Unknown"
-		};
-	}
-
-	private string GetStatusColor(PrinterStatus status)
-	{
-		return status switch
-		{
-			PrinterStatus.Idle => "success",
-			PrinterStatus.Printing => "primary",
-			PrinterStatus.Paused => "warning",
-			PrinterStatus.Error => "danger",
-			PrinterStatus.Offline => "secondary",
-			PrinterStatus.Maintenance => "info",
-			_ => "secondary"
-		};
-	}
-
-	private string GetJobStateColor(JobState status)
-	{
-		return status switch
-		{
-			JobState.Preparing => "info",
-			JobState.Printing => "primary",
-			JobState.Pausing => "success",
-			JobState.Paused => "warning",
-			JobState.Resuming => "success",
-			JobState.PostPrint => "success",
-			JobState.WaitCleanup => "info",
-			_ => "secondary"
-		};
-	}
 
 }
 
@@ -177,14 +136,54 @@
 		let refreshInterval = null;
 		let modalRefreshInterval = null;
 		let modalAutoRefreshEnabled = true;
+		
+		const connection = new signalR.HubConnectionBuilder()
+			.withUrl("/hubs/printers")
+			.withAutomaticReconnect()
+			.build();
 
-// Start auto-refresh when page loads
+		connection.on("PrintersSnapshot", (printers) => {
+			// Full list => (re)render the grid
+			// renderAllPrinters(printers);
+			console.log("Getting Snapshot:", printers);
+		});
+
+		connection.on("PrinterAdded", (printer) => {
+			// upsertPrinterCard(printer);   // create if missing
+			console.log("Printer added:", printer);
+		});
+
+		connection.on("PrinterChanged", (printer) => {
+			// Upsert one printer card in the grid
+			// upsertPrinterCard(printer);
+			console.log("Printer changed:", printer);
+		});
+
+		connection.on("PrinterRemoved", (id) => {
+			// Remove one printer card from the grid
+			// removePrinterCard(id);
+			console.log("Printer removed:", id);
+		});
+		
+		connection.start()
+			.then(() => connection.invoke("RequestSnapshot"))
+			.then(() => console.log("SignalR connected, snapshot requested"))
+			.catch(err => console.error("SignalR connection error:", err));
+
+		connection.onreconnected((_id) => {
+			console.log("Reconnected, requesting snapshot:", _id);
+			connection.invoke("RequestSnapshot");
+		});
+
+		////////////////////////////////////////////////////////////////////////////////////////////
+
+		// Start auto-refresh when page loads
 		window.addEventListener('load',
 			function() {
 				startAutoRefresh();
 			});
 
-// Listen for modal events
+		// Listen for modal events
 		document.getElementById('printerDetailsModal').addEventListener('shown.bs.modal',
 			function() {
 				startModalAutoRefresh();
