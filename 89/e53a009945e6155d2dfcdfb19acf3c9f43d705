@@ -1,0 +1,21 @@
+UltimakerMonitor.ApiService/UltimakerMonitor.ApiService.csproj
+  s_ab13d7066b9245::t_318d4789364b6e 12
+UltimakerMonitor.AppHost/UltimakerMonitor.AppHost.csproj
+  s_ab13d7066b9245::t_07bd8f0014f283 3,14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89e53a009945e6155d2dfcdfb19acf3c9f43d705",
+  "prompts": {},
+  "sessions": {
+    "s_ab13d7066b9245": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d2932a6-7faf-4c02-8945-c78bfc6c644d",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "B.N. Berrevoets <bert@berrevoets.net>"
+    }
+  }
+}
