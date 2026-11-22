@@ -361,3 +361,15 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# >>> repo-init >>>
+# Claude Code: personal settings and plugin data stores
+.claude/settings.local.json
+.claude/data/
+# VS Code workspace files stay local
+*.code-workspace
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+# <<< repo-init <<<
