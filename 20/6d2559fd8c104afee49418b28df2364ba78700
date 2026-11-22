@@ -1,0 +1,43 @@
+AGENTS.md
+  s_ab13d7066b9245::t_79bae3fa6c6007 76
+  s_ab13d7066b9245::t_f85bf3ec1c5269 66-75,77-81
+  s_ab13d7066b9245::t_636f35009e55ff 85-94
+  s_ab13d7066b9245::t_e96abea4094c4e 98-113
+  s_ab13d7066b9245::t_3e7c74e3cba5fe 41-62
+  s_ab13d7066b9245::t_56c54464285ff7 38-40
+  s_ab13d7066b9245::t_c914084ae33ad9 63-65
+  s_ab13d7066b9245::t_d3d4b9d1ea5fc3 82-84
+  s_ab13d7066b9245::t_3b3d1b81c4bbd6 95-97
+  s_ab13d7066b9245::t_9d32419da0193c 1-37
+README.md
+  s_ab13d7066b9245::t_0981b6250543ae 3-42
+  s_ab13d7066b9245::t_00b63889a30551 1-2
+  s_ab13d7066b9245::t_94b600b1892dd9 43-45
+  s_ab13d7066b9245::t_acc3f393774b6c 46-60
+.gitattributes
+  s_ab13d7066b9245::t_7461ee182af5c4 64-78
+.gitignore
+  s_ab13d7066b9245::t_3bf8e38d04df1b 363-375
+.markdownlint.json
+  s_ab13d7066b9245::t_6bfae126af1907 1-11
+CHANGELOG.md
+  s_ab13d7066b9245::t_ba06ee5ba7f4e1 1-84
+CLAUDE.md
+  s_ab13d7066b9245::t_d56fd86649e651 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "206d2559fd8c104afee49418b28df2364ba78700",
+  "prompts": {},
+  "sessions": {
+    "s_ab13d7066b9245": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d2932a6-7faf-4c02-8945-c78bfc6c644d",
+        "model": "unknown"
+      },
+      "human_author": "B.N. Berrevoets <bert@berrevoets.net>"
+    }
+  }
+}
